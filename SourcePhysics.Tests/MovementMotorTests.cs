@@ -1340,6 +1340,26 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void LiveJoltMovementQueryPreservesAuthoredCrouchedWaterCurrent()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(256, 0, 256, 128);
+        using var queries = new JoltMovementQueries(host);
+        queries.Volumes.AddWater(new SourceWaterVolume(
+            new SourceAabb(new(-2f, -2f, -2f), new(2f, 2f, 2f)), 1.1f,
+            Current: SourceWaterCurrent.Current0));
+
+        var standingLevel = queries.GetWaterLevel(Vector3.Zero, false);
+        var crouchedLevel = queries.GetWaterLevel(Vector3.Zero, true);
+        Assert.Equal(SourceWaterLevel.Waist, standingLevel);
+        Assert.Equal(SourceWaterLevel.Eyes, crouchedLevel);
+        Assert.Equal(SourceUnits.ToMeters(100f),
+            queries.GetWaterBaseVelocity(Vector3.Zero, standingLevel, false).X);
+        Assert.Equal(SourceUnits.ToMeters(150f),
+            queries.GetWaterBaseVelocity(Vector3.Zero, crouchedLevel, true).X);
+    }
+
+    [Fact]
     public void LadderUsesSourceClimbSpeedAndPlaneVelocity()
     {
         var queries = new FlatGroundQueries { LadderActive = true, LadderNormal = -Vector3.UnitX, LadderBodyId = 17 };

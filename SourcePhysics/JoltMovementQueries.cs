@@ -20,8 +20,8 @@ public sealed class JoltMovementQueries : ISourceMovementQueries, IDisposable
     public JoltMovementQueries(JoltPhysicsHost host, SourceMovementProfile? movementProfile = null)
     {
         this.host = host;
-        Volumes = new SourceMovementVolumes(movementProfile?.LadderFacingDotThreshold ?? -0.707f);
         var profile = movementProfile ?? new SourceMovementProfile();
+        Volumes = new SourceMovementVolumes(profile.LadderFacingDotThreshold, profile);
         if (profile.QueryRecoveryDistanceSourceUnits < 0f || !float.IsFinite(profile.QueryRecoveryDistanceSourceUnits))
             throw new ArgumentOutOfRangeException(nameof(movementProfile), "Query recovery distance must be finite and non-negative.");
         queryRecoveryDistance = SourceUnits.ToMeters(profile.QueryRecoveryDistanceSourceUnits);
@@ -153,6 +153,8 @@ public sealed class JoltMovementQueries : ISourceMovementQueries, IDisposable
     public SourceWaterLevel GetWaterLevel(Vector3 position, bool crouched) => Volumes.GetWaterLevel(position, crouched);
     public Vector3 GetWaterBaseVelocity(Vector3 position, SourceWaterLevel waterLevel) =>
         Volumes.GetWaterBaseVelocity(position, waterLevel);
+    public Vector3 GetWaterBaseVelocity(Vector3 position, SourceWaterLevel waterLevel, bool crouched) =>
+        Volumes.GetWaterBaseVelocity(position, waterLevel, crouched);
 
     public bool TryLadder(Vector3 position, Vector3 direction, out Vector3 normal, out int bodyId)
     {
