@@ -15,6 +15,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
 
     private SourceCollisionLayers? collisionLayers;
     private readonly List<BodyID> ownedBodies = new();
+    private readonly List<Constraint> ownedConstraints = new();
     private readonly Dictionary<uint, int> bodySurfaces = new();
     private readonly Dictionary<uint, SourceRigidBodyProfile> bodyProfiles = new();
     private readonly Dictionary<uint, SourceContents> bodyContents = new();
@@ -473,6 +474,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
     public void DestroyBody(BodyID id)
     {
         if (!initialized || !id.IsValid || !Bodies.IsAdded(id)) return;
+        foreach (var constraint in ownedConstraints.Where(constraint => ReferencesBody(constraint, id)).ToArray())
+            RemoveConstraint(constraint);
         var ownedId = id;
         Bodies.DestroyBody(in ownedId);
         ownedBodies.RemoveAll(candidate => candidate.ID == id.ID);
@@ -483,12 +486,44 @@ public sealed partial class JoltPhysicsHost : IDisposable
         sensorBodies.Remove(id.ID);
     }
 
+    /// Adds a native Jolt constraint under the host's lifetime owner. The host
+    /// removes it before either referenced body or the native PhysicsSystem is
+    /// destroyed, which is required by the installed JoltPhysicsSharp wrapper.
+    public void AddConstraint(Constraint constraint)
+    {
+        ArgumentNullException.ThrowIfNull(constraint);
+        if (!initialized) throw new InvalidOperationException("Initialize the Jolt host before adding constraints.");
+        if (constraint is TwoBodyConstraint twoBody &&
+            (!Bodies.IsAdded(twoBody.Body1.ID) || !Bodies.IsAdded(twoBody.Body2.ID)))
+            throw new ArgumentException("Every two-body constraint body must belong to this host.", nameof(constraint));
+        if (ownedConstraints.Contains(constraint)) return;
+        System.AddConstraint(constraint);
+        ownedConstraints.Add(constraint);
+    }
+
+    public bool RemoveConstraint(Constraint constraint)
+    {
+        ArgumentNullException.ThrowIfNull(constraint);
+        if (!ownedConstraints.Remove(constraint)) return false;
+        if (initialized) System.RemoveConstraint(constraint);
+        constraint.Dispose();
+        return true;
+    }
+
     public void Dispose()
     {
         if (!initialized) return;
         System.OnContactAdded -= Contacts.OnAdded;
         System.OnContactPersisted -= Contacts.OnPersisted;
         System.OnContactRemoved -= Contacts.OnRemoved;
+        // Jolt requires constraints to be detached before their bodies and
+        // before the PhysicsSystem native handle is released.
+        foreach (var constraint in ownedConstraints.ToArray())
+        {
+            System.RemoveConstraint(constraint);
+            constraint.Dispose();
+        }
+        ownedConstraints.Clear();
         foreach (var id in ownedBodies)
         {
             var ownedId = id;
@@ -535,5 +570,9 @@ public sealed partial class JoltPhysicsHost : IDisposable
         if (!initialized || !bodyId.IsValid || !Bodies.IsAdded(bodyId))
             throw new ArgumentException("Body is not in the Jolt system.", nameof(bodyId));
     }
+
+    private static bool ReferencesBody(Constraint constraint, BodyID bodyId) =>
+        constraint is TwoBodyConstraint twoBody &&
+        (twoBody.Body1.ID.ID == bodyId.ID || twoBody.Body2.ID.ID == bodyId.ID);
 
 }

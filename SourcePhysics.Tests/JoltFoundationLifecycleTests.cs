@@ -27,4 +27,5 @@ public sealed class JoltFoundationLifecycleTests
             host.Initialize(256, 0, 256, 128);
         }
     }
+
 }
