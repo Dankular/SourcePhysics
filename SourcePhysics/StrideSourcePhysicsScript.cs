@@ -58,6 +58,11 @@ public sealed class StrideSourcePhysicsScript : SyncScript
         PerformanceRecording = null;
         Host.Dispose();
         clock = null;
+        // Do not retain callbacks that may capture components from the
+        // disposed scene/world. A subsequent EnsureStarted begins a fresh
+        // authoritative lifecycle and requires fresh registrations.
+        fixedTickParticipants.Clear();
+        FixedTick = null;
         started = false;
     }
 

@@ -74,6 +74,21 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void StridePhysicsHostRestartDoesNotInvokeStaleTickCallbacks()
+    {
+        var script = new StrideSourcePhysicsScript { FixedStepSeconds = 1f / 66f };
+        var calls = 0;
+        script.RegisterFixedTick(_ => calls++);
+        script.EnsureStarted();
+        script.Cancel();
+        script.EnsureStarted();
+        script.Advance(script.FixedStepSeconds);
+
+        Assert.Equal(0, calls);
+        script.Cancel();
+    }
+
+    [Fact]
     public void JoltSweepReportsRotatedSlopeNormal()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
