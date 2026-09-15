@@ -23,6 +23,7 @@ public sealed class JoltVehicleWheelQueries
         this.vehicleBody = vehicleBody;
         this.profile = profile;
         queries = new JoltHitscanQueries(host, contentsMask: SourceContents.MaskPlayerSolid,
+            queryCollisionGroup: SourceCollisionGroup.Vehicle,
             ignoredBodyId: unchecked((int)vehicleBody.ID));
     }
 

@@ -171,8 +171,10 @@ public sealed class JoltMovementQueries : ISourceMovementQueries, IDisposable
         private readonly JoltPhysicsHost host;
         public MovementBodyFilter(JoltPhysicsHost host) => this.host = host;
         protected override bool ShouldCollide(BodyID bodyId) => !host.IsSensor(bodyId) && host.IsSolidBody(bodyId) &&
+            host.CanQueryCollide(SourceCollisionGroup.PlayerMovement, bodyId) &&
             (host.GetBodyContents(bodyId) & SourceContents.MaskPlayerSolid) != 0;
         protected override bool ShouldCollideLocked(Body body) => !host.IsSensor(body.ID) && host.IsSolidBody(body.ID) &&
+            host.CanQueryCollide(SourceCollisionGroup.PlayerMovement, body.ID) &&
             (host.GetBodyContents(body.ID) & SourceContents.MaskPlayerSolid) != 0;
     }
 }

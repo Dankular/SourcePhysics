@@ -785,6 +785,24 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void MovementQueryHonorsSourcePlayerMovementCollisionGroup()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(1024, 0, 1024, 256);
+        var pushaway = host.CreateBoxBody(new(0.5f), Vector3.Zero, JoltPhysicsSharp.MotionType.Static,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                CollisionGroup = SourceCollisionGroup.PushAway,
+                ContentsMask = SourceContents.Solid
+            });
+        using var queries = new JoltMovementQueries(host);
+
+        var hit = queries.SweepPlayer(new(0f, 2f, 0f), new(0f, -2f, 0f), false);
+
+        Assert.NotEqual(unchecked((int)pushaway.ID), hit.BodyId);
+    }
+
+    [Fact]
     public void JoltStaticMeshBodyProvidesTriangleCollisionForPlayerSweep()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());

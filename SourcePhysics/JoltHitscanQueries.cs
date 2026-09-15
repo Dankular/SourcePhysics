@@ -14,6 +14,7 @@ public sealed class JoltHitscanQueries : IDisposable
     private readonly JoltPhysicsHost host;
     private readonly bool includeSensors;
     private readonly SourceContents contentsMask;
+    private readonly SourceCollisionGroup queryCollisionGroup;
     private sealed class AllBroadPhaseFilter : BroadPhaseLayerFilter { protected override bool ShouldCollide(BroadPhaseLayer layer) => true; }
     private sealed class AllObjectLayerFilter : ObjectLayerFilter { protected override bool ShouldCollide(ObjectLayer layer) => true; }
     private sealed class AllBodyFilter : BodyFilter
@@ -22,32 +23,39 @@ public sealed class JoltHitscanQueries : IDisposable
         private readonly bool includeSensors;
         private readonly SourceContents contentsMask;
         private readonly int ignoredBodyId;
+        private readonly SourceCollisionGroup queryCollisionGroup;
 
-        public AllBodyFilter(JoltPhysicsHost host, bool includeSensors, SourceContents contentsMask, int ignoredBodyId)
+        public AllBodyFilter(JoltPhysicsHost host, bool includeSensors, SourceContents contentsMask, int ignoredBodyId,
+            SourceCollisionGroup queryCollisionGroup)
         {
             this.host = host;
             this.includeSensors = includeSensors;
             this.contentsMask = contentsMask;
             this.ignoredBodyId = ignoredBodyId;
+            this.queryCollisionGroup = queryCollisionGroup;
         }
 
         protected override bool ShouldCollide(BodyID bodyId) => bodyId.ID != unchecked((uint)ignoredBodyId) &&
             (includeSensors || !host.IsSensor(bodyId)) &&
             (host.IsSolidBody(bodyId) || (includeSensors && host.IsSensor(bodyId))) &&
+            host.CanQueryCollide(queryCollisionGroup, bodyId) &&
             (host.GetBodyContents(bodyId) & contentsMask) != 0;
         protected override bool ShouldCollideLocked(Body body) => body.ID.ID != unchecked((uint)ignoredBodyId) &&
             (includeSensors || !host.IsSensor(body.ID)) &&
             (host.IsSolidBody(body.ID) || (includeSensors && host.IsSensor(body.ID))) &&
+            host.CanQueryCollide(queryCollisionGroup, body.ID) &&
             (host.GetBodyContents(body.ID) & contentsMask) != 0;
     }
 
     public JoltHitscanQueries(JoltPhysicsHost host, bool includeSensors = false,
-        SourceContents contentsMask = SourceContents.MaskShot, int ignoredBodyId = -1)
+        SourceContents contentsMask = SourceContents.MaskShot, int ignoredBodyId = -1,
+        SourceCollisionGroup queryCollisionGroup = SourceCollisionGroup.None)
     {
         this.host = host;
         this.includeSensors = includeSensors;
         this.contentsMask = contentsMask;
         this.ignoredBodyId = ignoredBodyId;
+        this.queryCollisionGroup = queryCollisionGroup;
     }
 
     private readonly int ignoredBodyId;
@@ -66,7 +74,7 @@ public sealed class JoltHitscanQueries : IDisposable
         var result = default(RayCastResult);
         using var broadPhaseFilter = new AllBroadPhaseFilter();
         using var objectLayerFilter = new AllObjectLayerFilter();
-        using var bodyFilter = new AllBodyFilter(host, includeSensors, contentsMask, ignoredBodyId);
+        using var bodyFilter = new AllBodyFilter(host, includeSensors, contentsMask, ignoredBodyId, queryCollisionGroup);
         if (!host.NarrowPhase.CastRay(in origin, in rayDirection, out result, broadPhaseFilter, objectLayerFilter, bodyFilter))
         {
             hit = default;
@@ -89,7 +97,7 @@ public sealed class JoltHitscanQueries : IDisposable
         var results = new List<RayCastResult>();
         using var broadPhaseFilter = new AllBroadPhaseFilter();
         using var objectLayerFilter = new AllObjectLayerFilter();
-        using var bodyFilter = new AllBodyFilter(host, includeSensors, contentsMask, ignoredBodyId);
+        using var bodyFilter = new AllBodyFilter(host, includeSensors, contentsMask, ignoredBodyId, queryCollisionGroup);
         var settings = new RayCastSettings();
         host.NarrowPhase.CastRay(in origin, in rayDirection, settings, CollisionCollectorType.AllHitSorted,
             results, broadPhaseFilter, objectLayerFilter, bodyFilter);

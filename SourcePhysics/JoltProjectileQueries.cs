@@ -10,6 +10,7 @@ public sealed class JoltProjectileQueries : IProjectileQueries, IProjectilePenet
     private readonly JoltPhysicsHost host;
     private readonly Func<ProjectileHit, float, float>? penetrationCost;
     private readonly SourceContents contentsMask;
+    private readonly SourceCollisionGroup queryCollisionGroup;
     private readonly BoxShape shape;
     private readonly List<ShapeCastResult> hits = new();
     private readonly AllBroadPhaseFilter broadPhaseFilter = new();
@@ -18,15 +19,17 @@ public sealed class JoltProjectileQueries : IProjectileQueries, IProjectilePenet
 
     public JoltProjectileQueries(JoltPhysicsHost host, float radiusSourceUnits = 1f, bool includeSensors = false,
         Func<ProjectileHit, float, float>? penetrationCost = null,
-        SourceContents contentsMask = SourceContents.MaskShot)
+        SourceContents contentsMask = SourceContents.MaskShot,
+        SourceCollisionGroup queryCollisionGroup = SourceCollisionGroup.Projectile)
     {
         if (radiusSourceUnits <= 0f) throw new ArgumentOutOfRangeException(nameof(radiusSourceUnits));
         this.host = host;
         this.penetrationCost = penetrationCost;
         this.contentsMask = contentsMask;
+        this.queryCollisionGroup = queryCollisionGroup;
         var radius = SourceUnits.ToMeters(radiusSourceUnits);
         shape = new BoxShape(new Vector3(radius, radius, radius), 0.001f);
-        bodyFilter = new ProjectileBodyFilter(host, includeSensors, contentsMask);
+        bodyFilter = new ProjectileBodyFilter(host, includeSensors, contentsMask, queryCollisionGroup);
     }
 
     public bool Sweep(Vector3 start, Vector3 end, out ProjectileHit hit)
@@ -94,19 +97,24 @@ public sealed class JoltProjectileQueries : IProjectileQueries, IProjectilePenet
         private readonly JoltPhysicsHost host;
         private readonly bool includeSensors;
         private readonly SourceContents contentsMask;
+        private readonly SourceCollisionGroup queryCollisionGroup;
 
-        public ProjectileBodyFilter(JoltPhysicsHost host, bool includeSensors, SourceContents contentsMask)
+        public ProjectileBodyFilter(JoltPhysicsHost host, bool includeSensors, SourceContents contentsMask,
+            SourceCollisionGroup queryCollisionGroup)
         {
             this.host = host;
             this.includeSensors = includeSensors;
             this.contentsMask = contentsMask;
+            this.queryCollisionGroup = queryCollisionGroup;
         }
 
         protected override bool ShouldCollide(BodyID bodyId) => (includeSensors || !host.IsSensor(bodyId)) &&
             (host.IsSolidBody(bodyId) || (includeSensors && host.IsSensor(bodyId))) &&
+            host.CanQueryCollide(queryCollisionGroup, bodyId) &&
             (host.GetBodyContents(bodyId) & contentsMask) != 0;
         protected override bool ShouldCollideLocked(Body body) => (includeSensors || !host.IsSensor(body.ID)) &&
             (host.IsSolidBody(body.ID) || (includeSensors && host.IsSensor(body.ID))) &&
+            host.CanQueryCollide(queryCollisionGroup, body.ID) &&
             (host.GetBodyContents(body.ID) & contentsMask) != 0;
     }
 }

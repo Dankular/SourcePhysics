@@ -363,6 +363,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
     public SourceContents GetBodyContents(BodyID id) => bodyContents.TryGetValue(id.ID, out var contents) ? contents : SourceContents.Solid;
     public SourceCollisionGroup GetBodyCollisionGroup(BodyID id) =>
         bodyCollisionGroups.TryGetValue(id.ID, out var group) ? group : SourceCollisionGroup.None;
+    public bool CanQueryCollide(SourceCollisionGroup queryGroup, BodyID bodyId) =>
+        SourceCollisionRules.ShouldCollide(queryGroup, GetBodyCollisionGroup(bodyId));
     public void SetBodyCollisionGroup(BodyID id, SourceCollisionGroup group)
     {
         EnsureBody(id);
