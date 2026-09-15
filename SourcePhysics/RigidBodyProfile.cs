@@ -21,6 +21,8 @@ public sealed record SourceRigidBodyProfile
     /// Source collision-property solid flags. TriggerTouchDebris is retained below as a
     /// convenient compatibility alias for authored trigger profiles.
     public SourceSolidFlags SolidFlags { get; init; }
+    /// Optional Source collision group. None leaves the host's object-layer policy in control.
+    public SourceCollisionGroup CollisionGroup { get; init; }
     /// Source FSOLID_TRIGGER_TOUCH_DEBRIS: only authored trigger bodies with this flag
     /// receive trigger events from debris bodies.
     public bool TriggerTouchesDebris { get; init; }

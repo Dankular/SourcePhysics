@@ -699,6 +699,44 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceCollisionGroupMatrixMatchesReferencedGameRules()
+    {
+        Assert.False(SourceCollisionRules.ShouldCollide(SourceCollisionGroup.Player, SourceCollisionGroup.PushAway));
+        Assert.False(SourceCollisionRules.ShouldCollide(SourceCollisionGroup.Projectile, SourceCollisionGroup.Weapon));
+        Assert.True(SourceCollisionRules.ShouldCollide(SourceCollisionGroup.Vehicle, SourceCollisionGroup.VehicleClip));
+        Assert.True(SourceCollisionRules.ShouldCollide(SourceCollisionGroup.Debris, SourceCollisionGroup.PushAway));
+        Assert.True(SourceCollisionRules.ShouldCollide(SourceCollisionGroup.None, SourceCollisionGroup.Debris));
+    }
+
+    [Fact]
+    public void AuthoredSourceCollisionGroupsFilterSolverContacts()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(1024, 0, 1024, 256);
+        host.CreateBoxBody(new(1f), Vector3.Zero, JoltPhysicsSharp.MotionType.Static,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                GravityFactor = 0f,
+                CollisionGroup = SourceCollisionGroup.PushAway
+            });
+        var player = host.CreateBoxBody(new(0.25f), Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Player, new SourceRigidBodyProfile
+            {
+                GravityFactor = 0f,
+                CollisionGroup = SourceCollisionGroup.Player
+            });
+        var contacts = 0;
+        host.Contacts.ContactAdded += value =>
+        {
+            if (value.BodyA == player.ID || value.BodyB == player.ID) contacts++;
+        };
+
+        host.Step();
+
+        Assert.Equal(0, contacts);
+    }
+
+    [Fact]
     public void JoltStaticMeshBodyProvidesTriangleCollisionForPlayerSweep()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
