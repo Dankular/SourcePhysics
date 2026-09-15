@@ -14,7 +14,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
     private static extern uint GetMeshTriangleUserData(nint shape, uint subShapeId);
 
     private SourceCollisionLayers? collisionLayers;
-    private GroupFilterTable? sourceGroupFilter;
+    private SourceSimShapeFilter? sourceSimShapeFilter;
     private readonly List<BodyID> ownedBodies = new();
     private readonly List<Constraint> ownedConstraints = new();
     private readonly Dictionary<uint, int> bodySurfaces = new();
@@ -73,6 +73,17 @@ public sealed partial class JoltPhysicsHost : IDisposable
         return (flags & SourceSolidFlags.NotSolid) != 0 ? SourceObjectLayer.NonSolid : requested;
     }
 
+    private static SourceCollisionGroup GetEffectiveCollisionGroup(SourceObjectLayer layer, SourceCollisionGroup authored)
+    {
+        if (authored != SourceCollisionGroup.None) return authored;
+        return layer switch
+        {
+            SourceObjectLayer.Player => SourceCollisionGroup.Player,
+            SourceObjectLayer.Debris => SourceCollisionGroup.Debris,
+            _ => SourceCollisionGroup.None
+        };
+    }
+
     public void Initialize(uint maxBodies = 65536, uint numBodyMutexes = 0, uint maxBodyPairs = 65536, uint maxContactConstraints = 10240)
     {
         if (initialized) return;
@@ -84,12 +95,6 @@ public sealed partial class JoltPhysicsHost : IDisposable
             ownsFoundationReference = true;
         }
         collisionLayers = new SourceCollisionLayers(CollisionPolicy);
-        sourceGroupFilter = new GroupFilterTable((uint)Enum.GetValues<SourceCollisionGroup>().Length);
-        var groupCount = (uint)Enum.GetValues<SourceCollisionGroup>().Length;
-        for (var a = 0u; a < groupCount; a++)
-        for (var b = 0u; b < groupCount; b++)
-            if (!SourceCollisionRules.ShouldCollide((SourceCollisionGroup)a, (SourceCollisionGroup)b))
-                sourceGroupFilter.DisableCollision(new CollisionSubGroupID(a), new CollisionSubGroupID(b));
         var count = checked((int)maxBodies);
         var settings = new PhysicsSystemSettings
         {
@@ -100,6 +105,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
             ObjectVsBroadPhaseLayerFilter = collisionLayers.ObjectVsBroadPhase
         };
         system = new PhysicsSystem(settings) { Gravity = gravity };
+        sourceSimShapeFilter = new SourceSimShapeFilter(GetBodyCollisionGroup);
+        System.SetSimShapeFilter(sourceSimShapeFilter);
         var physicsSettings = System.Settings;
         physicsSettings.Baumgarte = SolverProfile.Baumgarte;
         physicsSettings.SpeculativeContactDistance = SolverProfile.SpeculativeContactDistanceMeters;
@@ -189,6 +196,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         }
         RVector3 precisePosition = position;
         var effectiveLayer = GetEffectiveLayer(layer, profile.SolidFlags);
+        var effectiveCollisionGroup = GetEffectiveCollisionGroup(effectiveLayer, profile.CollisionGroup);
         var isTrigger = effectiveLayer == SourceObjectLayer.Trigger;
         using var settings = new BodyCreationSettings(shape, precisePosition, rotation, motionType, new ObjectLayer((ushort)effectiveLayer))
         {
@@ -205,7 +213,6 @@ public sealed partial class JoltPhysicsHost : IDisposable
             IsSensor = isTrigger,
             OverrideMassProperties = OverrideMassProperties.MassAndInertiaProvided
         };
-        ApplySourceCollisionGroup(settings, profile.CollisionGroup);
         var massProperties = settings.MassPropertiesOverride;
         massProperties.SetMassAndInertiaOfSolidBox(halfExtent * 2f, profile.MassKg);
         settings.MassPropertiesOverride = massProperties;
@@ -220,7 +227,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyProfiles[id.ID] = profile;
         bodyContents[id.ID] = profile.ContentsMask;
         bodyLayers[id.ID] = effectiveLayer;
-        bodyCollisionGroups[id.ID] = profile.CollisionGroup;
+        bodyCollisionGroups[id.ID] = effectiveCollisionGroup;
         if ((profile.SolidFlags & SourceSolidFlags.NotSolid) != 0 && !isTrigger)
             nonSolidBodies.Add(id.ID);
         if (isTrigger)
@@ -271,6 +278,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         using var shape = settings.Create();
         RVector3 precisePosition = position;
         var effectiveLayer = GetEffectiveLayer(layer, profile.SolidFlags);
+        var effectiveCollisionGroup = GetEffectiveCollisionGroup(effectiveLayer, profile.CollisionGroup);
         var isTrigger = effectiveLayer == SourceObjectLayer.Trigger;
         using var bodySettings = new BodyCreationSettings(shape, precisePosition, rotation,
             MotionType.Static, new ObjectLayer((ushort)effectiveLayer))
@@ -279,7 +287,6 @@ public sealed partial class JoltPhysicsHost : IDisposable
             Restitution = profile.Restitution,
             IsSensor = isTrigger
         };
-        ApplySourceCollisionGroup(bodySettings, profile.CollisionGroup);
         var id = Bodies.CreateAndAddBody(bodySettings, Activation.DontActivate);
         if (!id.IsValid) throw new InvalidOperationException("Jolt rejected static mesh creation.");
         Bodies.SetFriction(id, profile.Friction);
@@ -290,7 +297,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyProfiles[id.ID] = new SourceRigidBodyProfile { Friction = profile.Friction, Restitution = profile.Restitution };
         bodyContents[id.ID] = profile.ContentsMask;
         bodyLayers[id.ID] = effectiveLayer;
-        bodyCollisionGroups[id.ID] = profile.CollisionGroup;
+        bodyCollisionGroups[id.ID] = effectiveCollisionGroup;
         if ((profile.SolidFlags & SourceSolidFlags.NotSolid) != 0 && !isTrigger)
             nonSolidBodies.Add(id.ID);
         if (profile.TriangleSurfaceIds is not null) perTriangleSurfaceBodies.Add(id.ID);
@@ -315,12 +322,6 @@ public sealed partial class JoltPhysicsHost : IDisposable
         return !otherIsDebris || triggerTouchesDebris.Contains(trigger.ID);
     }
 
-    private void ApplySourceCollisionGroup(BodyCreationSettings settings, SourceCollisionGroup group)
-    {
-        if (group == SourceCollisionGroup.None || sourceGroupFilter is null) return;
-        settings.CollisionGroup = new CollisionGroup(sourceGroupFilter, new CollisionGroupID(0),
-            new CollisionSubGroupID((uint)group));
-    }
     public SourceContents GetBodyContents(BodyID id) => bodyContents.TryGetValue(id.ID, out var contents) ? contents : SourceContents.Solid;
     public SourceCollisionGroup GetBodyCollisionGroup(BodyID id) =>
         bodyCollisionGroups.TryGetValue(id.ID, out var group) ? group : SourceCollisionGroup.None;
@@ -618,8 +619,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyCollisionGroups.Clear();
         triggerTouchesDebris.Clear();
         nonSolidBodies.Clear();
-        sourceGroupFilter?.Dispose();
-        sourceGroupFilter = null;
+        sourceSimShapeFilter?.Dispose();
+        sourceSimShapeFilter = null;
         preStepControllers.Clear();
         // PhysicsSystem owns the native contact/activation listeners and the
         // native world handle. It must be destroyed after its bodies and

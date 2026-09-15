@@ -722,8 +722,7 @@ public sealed class MovementMotorTests
         var player = host.CreateBoxBody(new(0.25f), Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
             SourceObjectLayer.Player, new SourceRigidBodyProfile
             {
-                GravityFactor = 0f,
-                CollisionGroup = SourceCollisionGroup.Player
+                GravityFactor = 0f
             });
         var contacts = 0;
         host.Contacts.ContactAdded += value =>
@@ -733,6 +732,7 @@ public sealed class MovementMotorTests
 
         host.Step();
 
+        Assert.Equal(SourceCollisionGroup.Player, host.GetBodyCollisionGroup(player));
         Assert.Equal(0, contacts);
     }
 
