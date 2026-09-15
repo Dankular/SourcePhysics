@@ -47,11 +47,14 @@ public sealed class SourceMovementVolumes
     }
 
     public Vector3 GetWaterBaseVelocity(Vector3 position, SourceWaterLevel waterLevel)
+        => GetWaterBaseVelocity(position, waterLevel, false);
+
+    public Vector3 GetWaterBaseVelocity(Vector3 position, SourceWaterLevel waterLevel, bool crouched)
     {
         if (waterLevel == SourceWaterLevel.Dry) return Vector3.Zero;
         foreach (var volume in water)
         {
-            var sample = SampleWater(position, false);
+            var sample = SampleWater(position, crouched);
             if (sample.Level == SourceWaterLevel.Dry || sample.Volume != volume) continue;
             var direction = Vector3.Zero;
             if (volume.Current.HasFlag(SourceWaterCurrent.Current0)) direction.X += 1f;

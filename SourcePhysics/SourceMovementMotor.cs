@@ -35,7 +35,7 @@ public sealed class SourceMovementMotor
         if (dt <= 0) throw new ArgumentOutOfRangeException(nameof(dt));
         var wasWaterJumping = State.WaterJumpTime > 0f;
         var waterLevel = queries.GetWaterLevel(State.Position, State.Ducking);
-        var waterBaseVelocity = queries.GetWaterBaseVelocity(State.Position, waterLevel);
+        var waterBaseVelocity = queries.GetWaterBaseVelocity(State.Position, waterLevel, State.Ducking);
         var state = State with { Jumped = false, MoveType = input.MoveType,
             WaterJumpTime = MathF.Max(0f, State.WaterJumpTime - dt),
             WaterLevel = waterLevel,

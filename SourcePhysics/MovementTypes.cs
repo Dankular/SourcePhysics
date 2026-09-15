@@ -72,6 +72,8 @@ public interface ISourceMovementQueries
     /// direction to the player's base velocity. Providers that have no
     /// current return zero.
     Vector3 GetWaterBaseVelocity(Vector3 position, SourceWaterLevel waterLevel) => Vector3.Zero;
+    Vector3 GetWaterBaseVelocity(Vector3 position, SourceWaterLevel waterLevel, bool crouched) =>
+        GetWaterBaseVelocity(position, waterLevel);
     bool TryGetObserverTarget(out MovementState target)
     {
         target = default;
