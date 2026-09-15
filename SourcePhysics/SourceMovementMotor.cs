@@ -39,7 +39,7 @@ public sealed class SourceMovementMotor
         var state = State with { Jumped = false, MoveType = input.MoveType,
             WaterJumpTime = MathF.Max(0f, State.WaterJumpTime - dt),
             WaterLevel = waterLevel,
-            BaseVelocity = waterLevel != SourceWaterLevel.Dry ? waterBaseVelocity : Vector3.Zero };
+            BaseVelocity = waterLevel != SourceWaterLevel.Dry ? waterBaseVelocity : State.BaseVelocity };
         // PlayerMove categorizes the existing hull before Duck() decides
         // whether a ground transition may begin. Re-categorize when Duck()
         // actually changes the active hull, matching FinishDuck/FinishUnDuck.
@@ -48,6 +48,8 @@ public sealed class SourceMovementMotor
         state = UpdateDuck(state, input.IsDown(Buttons.Duck), dt);
         if (state.Ducking != duckingBeforeUpdate)
             Categorize(ref state);
+        if (state.WaterLevel == SourceWaterLevel.Dry && state.GroundBodyId >= 0)
+            state = state with { BaseVelocity = queries.GetBodyPointVelocity(state.GroundBodyId, state.Position) };
         if (wasWaterJumping)
         {
             // FullWalkMove calls WaterJump then TryPlayerMove for the whole
@@ -206,22 +208,29 @@ public sealed class SourceMovementMotor
             FinalizeWalk(ref s);
             return;
         }
-        Gravity(ref s, dt, 0.5f); if (s.Ground == GroundState.Grounded) Friction(ref s, dt);
+        StartGravity(ref s, dt); if (s.Ground == GroundState.Grounded) Friction(ref s, dt);
         if (input.IsDown(Buttons.Jump) && !wasJumpDown && s.Ground == GroundState.Grounded)
-        { s = s with { Velocity = new(s.Velocity.X, profile.JumpSpeed * s.SurfaceJumpFactor, s.Velocity.Z), Ground = GroundState.Airborne, GroundBodyId = -1, Jumped = true }; Move(ref s, dt); Gravity(ref s, dt, 0.5f); FinalizeWalk(ref s); return; }
+        { s = s with { Velocity = new(s.Velocity.X, profile.JumpSpeed * s.SurfaceJumpFactor, s.Velocity.Z), Ground = GroundState.Airborne, GroundBodyId = -1, Jumped = true }; Move(ref s, dt); FinishGravity(ref s, dt); FinalizeWalk(ref s); return; }
         var wish = Wish(input, s.Ducking, false, s.SurfaceMaxSpeedFactor);
         if (s.Ground == GroundState.Grounded)
         {
             s = s with { Velocity = new(s.Velocity.X, 0, s.Velocity.Z) }; Accelerate(ref s, wish.Direction, wish.Speed, profile.GroundAcceleration, dt, false);
-            var baseVelocity = s.GroundBodyId >= 0 ? queries.GetBodyPointVelocity(s.GroundBodyId, s.Position) : Vector3.Zero;
+            var baseVelocity = s.GroundBodyId >= 0 ? s.BaseVelocity : Vector3.Zero;
             var start = s.Position; var original = s with { Velocity = s.Velocity + baseVelocity, BaseVelocity = baseVelocity };
             s = original; Move(ref s, dt); var direct = s; var directDistance = Vector3.DistanceSquared(start, s.Position);
             s = original with { Position = start }; Step(ref s, dt);
             if (Vector3.DistanceSquared(start, s.Position) < directDistance) s = direct;
-            s = s with { Velocity = s.Velocity - baseVelocity, BaseVelocity = Vector3.Zero }; StayOnGround(ref s);
+            s = s with { Velocity = s.Velocity - baseVelocity, BaseVelocity = baseVelocity }; StayOnGround(ref s);
         }
-        else { Accelerate(ref s, wish.Direction, wish.Speed, profile.AirAcceleration, dt, true); Move(ref s, dt); }
-        Gravity(ref s, dt, 0.5f);
+        else
+        {
+            Accelerate(ref s, wish.Direction, wish.Speed, profile.AirAcceleration, dt, true);
+            var baseVelocity = s.BaseVelocity;
+            s = s with { Velocity = s.Velocity + baseVelocity };
+            Move(ref s, dt);
+            s = s with { Velocity = s.Velocity - baseVelocity };
+        }
+        FinishGravity(ref s, dt);
         FinalizeWalk(ref s);
     }
 
@@ -514,7 +523,7 @@ public sealed class SourceMovementMotor
                 return;
             }
             allFraction += hit.Fraction;
-            if (hit.Fraction > 0f)
+            if (hit.Fraction > 0f && hit.Fraction < 1f)
             {
                 s = s with { Position = hit.Position };
                 original = s.Velocity;
@@ -523,7 +532,10 @@ public sealed class SourceMovementMotor
             }
             if (hit.Fraction >= 1f)
             {
-                s = s with { Position = s.Position + s.Velocity * timeLeft };
+                // A clear trace already reports its end position. Advancing
+                // from hit.Position again would move twice for every clear
+                // Source sweep.
+                s = s with { Position = hit.Position };
                 // Source re-traces the final position with a stationary hull
                 // after a supposedly clear sweep. This catches terrain and
                 // triangle-edge precision cases that would otherwise leave a
@@ -625,7 +637,32 @@ public sealed class SourceMovementMotor
     }
 
     private void StayOnGround(ref MovementState s) { var hit = queries.SweepPlayer(s.Position + Vector3.UnitY * SourceUnits.ToMeters(2), s.Position - Vector3.UnitY * profile.StepHeight, s.Ducking); if (!hit.StartSolid && hit.Fraction < 1 && hit.Normal.Y >= profile.StandableNormalZ) s = s with { Position = hit.Position }; }
-    private void Gravity(ref MovementState s, float dt, float fraction) { if (s.WaterJumpTime <= 0) s = s with { Velocity = s.Velocity - Vector3.UnitY * profile.Gravity * dt * fraction }; }
+    private void StartGravity(ref MovementState s, float dt)
+    {
+        if (s.WaterJumpTime > 0f) return;
+        var baseVelocity = s.BaseVelocity;
+        s = s with
+        {
+            // Source StartGravity applies half gravity and the moving-ground
+            // vertical velocity for this frame, then keeps only horizontal
+            // base velocity for WalkMove/AirMove.
+            Velocity = s.Velocity - Vector3.UnitY * profile.Gravity * dt * 0.5f +
+                Vector3.UnitY * baseVelocity.Y * dt,
+            BaseVelocity = new Vector3(baseVelocity.X, 0f, baseVelocity.Z)
+        };
+    }
+
+    private void FinishGravity(ref MovementState s, float dt)
+    {
+        if (s.WaterJumpTime <= 0f)
+            s = s with { Velocity = s.Velocity - Vector3.UnitY * profile.Gravity * dt * 0.5f };
+    }
+
+    private void Gravity(ref MovementState s, float dt, float fraction)
+    {
+        if (s.WaterJumpTime <= 0)
+            s = s with { Velocity = s.Velocity - Vector3.UnitY * profile.Gravity * dt * fraction };
+    }
     private MovementState Clamp(MovementState s) => s with { Velocity = new(Math.Clamp(s.Velocity.X, -profile.MaxVelocity, profile.MaxVelocity), Math.Clamp(s.Velocity.Y, -profile.MaxVelocity, profile.MaxVelocity), Math.Clamp(s.Velocity.Z, -profile.MaxVelocity, profile.MaxVelocity)) };
     private static bool IsFinite(Vector3 value) => float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
     private static Vector3 Forward(float yaw) => new(MathF.Cos(yaw), 0, MathF.Sin(yaw));

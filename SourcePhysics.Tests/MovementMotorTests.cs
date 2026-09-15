@@ -1224,6 +1224,44 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void AirMoveCarriesHorizontalSourceBaseVelocityAndRemovesItFromPlayerVelocity()
+    {
+        var queries = new FlatGroundQueries();
+        var motor = new SourceMovementMotor(new SourceMovementProfile(), queries,
+            new Vector3(0f, 1f, 0f));
+        motor.LoadState(motor.State with
+        {
+            Position = new Vector3(0f, 1f, 0f),
+            Ground = GroundState.Airborne,
+            GroundBodyId = -1,
+            BaseVelocity = new Vector3(1f, 0f, 0f)
+        });
+
+        var dt = 1f / 66f;
+        motor.Tick(new SourceInput(Vector2.Zero, Buttons.None), dt);
+
+        Assert.Equal(dt, motor.State.Position.X, 5);
+        Assert.Equal(0f, motor.State.Velocity.X, 5);
+        Assert.Equal(1f, motor.State.BaseVelocity.X, 5);
+    }
+
+    [Fact]
+    public void GroundMoveUsesCurrentMovingGroundPointVelocityAndPreservesBaseVelocity()
+    {
+        var queries = new FlatGroundQueries { ContactBodyId = 7, PointVelocity = new Vector3(1f, 0f, 0f) };
+        var motor = new SourceMovementMotor(new SourceMovementProfile(), queries,
+            new Vector3(0f, 0.04f, 0f));
+
+        var dt = 1f / 66f;
+        motor.Tick(new SourceInput(Vector2.Zero, Buttons.None), dt);
+
+        Assert.Equal(dt, motor.State.Position.X, 5);
+        Assert.Equal(7, motor.State.GroundBodyId);
+        Assert.Equal(1f, motor.State.BaseVelocity.X, 5);
+        Assert.Equal(0f, motor.State.Velocity.X, 5);
+    }
+
+    [Fact]
     public void ClearSweepStillRejectsAStationaryHullThatEndsEmbedded()
     {
         var queries = new FlatGroundQueries { Empty = false };
@@ -2328,6 +2366,7 @@ public sealed class MovementMotorTests
         public Vector3 WaterJumpVelocity { get; set; }
         public float WaterJumpDuration { get; set; }
         public int ContactBodyId { get; set; } = -1;
+        public Vector3 PointVelocity { get; set; }
         public int ImpulseCount { get; private set; }
         public int LastImpulseBodyId { get; private set; } = -1;
         public Vector3 LastImpulse { get; private set; }
@@ -2340,7 +2379,7 @@ public sealed class MovementMotorTests
             return new(end, Vector3.UnitY, 1f, -1, 1, 0);
         }
         public bool IsEmpty(Vector3 position, bool crouched) => Empty;
-        public Vector3 GetBodyPointVelocity(int bodyId, Vector3 worldPoint) => Vector3.Zero;
+        public Vector3 GetBodyPointVelocity(int bodyId, Vector3 worldPoint) => PointVelocity;
         public void ApplyCharacterImpulse(int bodyId, Vector3 point, Vector3 impulse)
         {
             ImpulseCount++;
