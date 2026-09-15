@@ -3,7 +3,7 @@ using System.Numerics;
 namespace SourcePhysics;
 
 public readonly record struct ProjectileHit(Vector3 Position, Vector3 Normal, int BodyId, float Restitution,
-    int SurfaceId = 0, float ThicknessInches = 0f);
+    int SurfaceId = 0, float ThicknessInches = 0f, float Fraction = 1f);
 public readonly record struct ProjectileState(Vector3 Position, Vector3 Velocity, bool Active, int Bounces,
     int Penetrations = 0, float PenetrationPowerRemaining = 0f);
 
@@ -18,6 +18,12 @@ public interface IProjectilePenetrationQueries
         float availablePower, out Vector3 exitPosition, out Vector3 exitVelocity, out float consumedPower);
 }
 
+public enum SourceProjectileCollisionMode
+{
+    Generic,
+    CounterStrikeGrenade
+}
+
 public sealed record SourceProjectileProfile
 {
     public float GravitySourceUnitsPerSecondSquared { get; init; } = 800f;
@@ -28,6 +34,7 @@ public sealed record SourceProjectileProfile
     public int MaximumPenetrations { get; init; }
     public float MaximumVelocitySourceUnitsPerSecond { get; init; } = 3500f;
     public bool ContinuousCollision { get; init; } = true;
+    public SourceProjectileCollisionMode CollisionMode { get; init; } = SourceProjectileCollisionMode.Generic;
 }
 
 public sealed class SourceProjectileMotor
@@ -35,6 +42,9 @@ public sealed class SourceProjectileMotor
     private readonly SourceProjectileProfile profile;
     private readonly IProjectileQueries queries;
     public ProjectileState State { get; private set; }
+    /// Title-owned body classification used only by the Source custom
+    /// Counter-Strike grenade collision law.
+    public Func<int, bool>? IsPlayerBody { get; set; }
 
     public SourceProjectileMotor(SourceProjectileProfile profile, IProjectileQueries queries, Vector3 position, Vector3 velocity)
     {
@@ -64,6 +74,11 @@ public sealed class SourceProjectileMotor
                 State.Penetrations + 1, remainingPower);
             return hit;
         }
+        if (profile.CollisionMode == SourceProjectileCollisionMode.CounterStrikeGrenade)
+        {
+            ResolveCounterStrikeGrenadeCollision(hit, velocity, dt);
+            return hit;
+        }
         if (State.Bounces < profile.MaximumBounces)
         {
             var reflected = velocity - 2f * Vector3.Dot(velocity, hit.Normal) * hit.Normal;
@@ -71,5 +86,32 @@ public sealed class SourceProjectileMotor
         }
         else State = new(hit.Position, Vector3.Zero, false, State.Bounces);
         return hit;
+    }
+
+    private void ResolveCounterStrikeGrenadeCollision(in ProjectileHit hit, Vector3 velocity, float dt)
+    {
+        // CBaseCSGrenadeProjectile::ResolveFlyCollisionCustom treats the
+        // surface as perfectly elastic, except for player contacts, then
+        // clamps the projectile elasticity to [0, .9].
+        var surfaceElasticity = IsPlayerBody?.Invoke(hit.BodyId) == true ? 0.3f : 1f;
+        var totalElasticity = Math.Clamp(profile.Restitution * surfaceElasticity, 0f, 0.9f);
+        var clipped = velocity - hit.Normal * Vector3.Dot(velocity, hit.Normal) * 2f;
+        var reflected = clipped * totalElasticity;
+        var stopSpeed = SourceUnits.ToMeters(30f);
+        var speedSquared = reflected.LengthSquared();
+        if (speedSquared < stopSpeed * stopSpeed || State.Bounces >= profile.MaximumBounces)
+        {
+            State = State with { Position = hit.Position, Velocity = Vector3.Zero, Active = false };
+            return;
+        }
+
+        var position = hit.Position;
+        if (hit.Normal.Y > 0.7f)
+        {
+            // The Source custom floor path pushes the remaining fraction of
+            // the frame after a high-speed bounce.
+            position += reflected * ((1f - Math.Clamp(hit.Fraction, 0f, 1f)) * dt * 0.9f);
+        }
+        State = State with { Position = position, Velocity = reflected, Bounces = State.Bounces + 1 };
     }
 }

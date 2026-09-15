@@ -47,7 +47,8 @@ public sealed class JoltProjectileQueries : IProjectileQueries, IProjectilePenet
             : Vector3.UnitY;
         var surface = host.GetBodySurface(result.BodyID2, result.SubShapeID2, out var surfaceId);
         hit = new(Vector3.Lerp(start, end, result.Fraction), normal,
-            unchecked((int)result.BodyID2.ID), surface.Elasticity, surfaceId, surface.ThicknessInches);
+            unchecked((int)result.BodyID2.ID), surface.Elasticity, surfaceId, surface.ThicknessInches,
+            result.Fraction);
         return true;
     }
 

@@ -1558,6 +1558,44 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void CounterStrikeGrenadeCollisionUsesClampedElasticityAndPlayerReduction()
+    {
+        var projectile = new SourceProjectileMotor(new SourceProjectileProfile
+        {
+            GravityScale = 0f,
+            Restitution = 2f,
+            MaximumBounces = 2,
+            CollisionMode = SourceProjectileCollisionMode.CounterStrikeGrenade
+        }, new PlaneProjectileQueries(), new(0, 1, 0), new(0, -10, 0));
+
+        projectile.IsPlayerBody = _ => true;
+        projectile.Tick(0.1f);
+
+        // Source uses 0.3 player elasticity: 2.0 * 0.3 = 0.6, then
+        // PhysicsClipVelocity's 2.0 reflection reverses the -10 velocity.
+        Assert.Equal(6f, projectile.State.Velocity.Y, 4);
+        Assert.True(projectile.State.Active);
+        Assert.Equal(1, projectile.State.Bounces);
+    }
+
+    [Fact]
+    public void CounterStrikeGrenadeCollisionStopsBelowSourceRestingSpeed()
+    {
+        var projectile = new SourceProjectileMotor(new SourceProjectileProfile
+        {
+            GravityScale = 0f,
+            Restitution = 1f,
+            MaximumBounces = 2,
+            CollisionMode = SourceProjectileCollisionMode.CounterStrikeGrenade
+        }, new PlaneProjectileQueries(), new(0, 0.1f, 0), new(0, -0.5f, 0));
+
+        projectile.Tick(0.4f);
+
+        Assert.False(projectile.State.Active);
+        Assert.Equal(Vector3.Zero, projectile.State.Velocity);
+    }
+
+    [Fact]
     public void ProjectileUsesConfiguredGravityRatherThanHiddenConstant()
     {
         var queries = new NoHitProjectileQueries();
