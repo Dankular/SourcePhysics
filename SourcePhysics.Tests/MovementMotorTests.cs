@@ -684,6 +684,28 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void RuntimeSourceSolidFlagChangeUpdatesLayerAndSensorState()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(1024, 0, 1024, 256);
+        var body = host.CreateBoxBody(new(0.5f), Vector3.Zero, JoltPhysicsSharp.MotionType.Static,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                SolidFlags = SourceSolidFlags.NotSolid,
+                ContentsMask = SourceContents.Solid
+            });
+        using var movementQueries = new JoltMovementQueries(host);
+
+        Assert.False(host.IsSolidBody(body));
+        Assert.Equal(-1, movementQueries.SweepPlayer(new(0f, 2f, 0f), new(0f, -2f, 0f), false).BodyId);
+
+        host.SetBodySolidFlags(body, SourceSolidFlags.None);
+
+        Assert.True(host.IsSolidBody(body));
+        Assert.Equal(unchecked((int)body.ID), movementQueries.SweepPlayer(new(0f, 2f, 0f), new(0f, -2f, 0f), false).BodyId);
+    }
+
+    [Fact]
     public void AuthoredCollisionPolicyCanDisableAConfiguredLayerPair()
     {
         var policy = new SourceCollisionPolicy();

@@ -21,6 +21,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
     private readonly Dictionary<uint, SourceRigidBodyProfile> bodyProfiles = new();
     private readonly Dictionary<uint, SourceContents> bodyContents = new();
     private readonly Dictionary<uint, SourceObjectLayer> bodyLayers = new();
+    private readonly Dictionary<uint, SourceObjectLayer> bodyRequestedLayers = new();
+    private readonly Dictionary<uint, SourceSolidFlags> bodySolidFlags = new();
     private readonly Dictionary<uint, SourceCollisionGroup> bodyCollisionGroups = new();
     private readonly HashSet<uint> triggerTouchesDebris = new();
     private readonly HashSet<uint> nonSolidBodies = new();
@@ -197,6 +199,9 @@ public sealed partial class JoltPhysicsHost : IDisposable
         RVector3 precisePosition = position;
         var effectiveLayer = GetEffectiveLayer(layer, profile.SolidFlags);
         var effectiveCollisionGroup = GetEffectiveCollisionGroup(effectiveLayer, profile.CollisionGroup);
+        var effectiveSolidFlags = profile.SolidFlags |
+            (effectiveLayer == SourceObjectLayer.Trigger ? SourceSolidFlags.Trigger : SourceSolidFlags.None) |
+            (profile.TriggerTouchesDebris ? SourceSolidFlags.TriggerTouchDebris : SourceSolidFlags.None);
         var isTrigger = effectiveLayer == SourceObjectLayer.Trigger;
         using var settings = new BodyCreationSettings(shape, precisePosition, rotation, motionType, new ObjectLayer((ushort)effectiveLayer))
         {
@@ -227,13 +232,15 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyProfiles[id.ID] = profile;
         bodyContents[id.ID] = profile.ContentsMask;
         bodyLayers[id.ID] = effectiveLayer;
+        bodyRequestedLayers[id.ID] = layer;
+        bodySolidFlags[id.ID] = effectiveSolidFlags;
         bodyCollisionGroups[id.ID] = effectiveCollisionGroup;
-        if ((profile.SolidFlags & SourceSolidFlags.NotSolid) != 0 && !isTrigger)
+        if ((effectiveSolidFlags & SourceSolidFlags.NotSolid) != 0 && !isTrigger)
             nonSolidBodies.Add(id.ID);
         if (isTrigger)
         {
             sensorBodies.Add(id.ID);
-            if (profile.TriggerTouchesDebris || (profile.SolidFlags & SourceSolidFlags.TriggerTouchDebris) != 0)
+            if ((effectiveSolidFlags & SourceSolidFlags.TriggerTouchDebris) != 0)
                 triggerTouchesDebris.Add(id.ID);
         }
         return id;
@@ -279,6 +286,9 @@ public sealed partial class JoltPhysicsHost : IDisposable
         RVector3 precisePosition = position;
         var effectiveLayer = GetEffectiveLayer(layer, profile.SolidFlags);
         var effectiveCollisionGroup = GetEffectiveCollisionGroup(effectiveLayer, profile.CollisionGroup);
+        var effectiveSolidFlags = profile.SolidFlags |
+            (effectiveLayer == SourceObjectLayer.Trigger ? SourceSolidFlags.Trigger : SourceSolidFlags.None) |
+            (profile.TriggerTouchesDebris ? SourceSolidFlags.TriggerTouchDebris : SourceSolidFlags.None);
         var isTrigger = effectiveLayer == SourceObjectLayer.Trigger;
         using var bodySettings = new BodyCreationSettings(shape, precisePosition, rotation,
             MotionType.Static, new ObjectLayer((ushort)effectiveLayer))
@@ -297,14 +307,16 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyProfiles[id.ID] = new SourceRigidBodyProfile { Friction = profile.Friction, Restitution = profile.Restitution };
         bodyContents[id.ID] = profile.ContentsMask;
         bodyLayers[id.ID] = effectiveLayer;
+        bodyRequestedLayers[id.ID] = layer;
+        bodySolidFlags[id.ID] = effectiveSolidFlags;
         bodyCollisionGroups[id.ID] = effectiveCollisionGroup;
-        if ((profile.SolidFlags & SourceSolidFlags.NotSolid) != 0 && !isTrigger)
+        if ((effectiveSolidFlags & SourceSolidFlags.NotSolid) != 0 && !isTrigger)
             nonSolidBodies.Add(id.ID);
         if (profile.TriangleSurfaceIds is not null) perTriangleSurfaceBodies.Add(id.ID);
         if (isTrigger)
         {
             sensorBodies.Add(id.ID);
-            if (profile.TriggerTouchesDebris || (profile.SolidFlags & SourceSolidFlags.TriggerTouchDebris) != 0)
+            if ((effectiveSolidFlags & SourceSolidFlags.TriggerTouchDebris) != 0)
                 triggerTouchesDebris.Add(id.ID);
         }
         return id;
@@ -312,6 +324,32 @@ public sealed partial class JoltPhysicsHost : IDisposable
 
     public bool IsSensor(BodyID id) => sensorBodies.Contains(id.ID);
     public bool IsSolidBody(BodyID id) => !nonSolidBodies.Contains(id.ID);
+    public SourceSolidFlags GetBodySolidFlags(BodyID id) =>
+        bodySolidFlags.TryGetValue(id.ID, out var flags) ? flags : SourceSolidFlags.None;
+    public void SetBodySolidFlags(BodyID id, SourceSolidFlags flags)
+    {
+        EnsureBody(id);
+        if (!bodyRequestedLayers.TryGetValue(id.ID, out var requestedLayer))
+            requestedLayer = SourceObjectLayer.World;
+        var effectiveLayer = GetEffectiveLayer(requestedLayer, flags);
+        var objectLayer = new ObjectLayer((ushort)effectiveLayer);
+        var ownedId = id;
+        Bodies.SetObjectLayer(in ownedId, in objectLayer);
+        Bodies.SetIsSensor(in ownedId, effectiveLayer == SourceObjectLayer.Trigger);
+        bodyLayers[id.ID] = effectiveLayer;
+        bodySolidFlags[id.ID] = flags |
+            (effectiveLayer == SourceObjectLayer.Trigger ? SourceSolidFlags.Trigger : SourceSolidFlags.None);
+        if ((flags & SourceSolidFlags.NotSolid) != 0 && effectiveLayer != SourceObjectLayer.Trigger)
+            nonSolidBodies.Add(id.ID);
+        else
+            nonSolidBodies.Remove(id.ID);
+        if ((flags & SourceSolidFlags.TriggerTouchDebris) != 0 && effectiveLayer == SourceObjectLayer.Trigger)
+            triggerTouchesDebris.Add(id.ID);
+        else
+            triggerTouchesDebris.Remove(id.ID);
+        if (effectiveLayer == SourceObjectLayer.Trigger) sensorBodies.Add(id.ID);
+        else sensorBodies.Remove(id.ID);
+    }
     private bool ShouldTouchTrigger(BodyID trigger, BodyID other)
     {
         if (!IsSensor(trigger)) return false;
@@ -566,6 +604,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
         perTriangleSurfaceBodies.Remove(id.ID);
         sensorBodies.Remove(id.ID);
         bodyLayers.Remove(id.ID);
+        bodyRequestedLayers.Remove(id.ID);
+        bodySolidFlags.Remove(id.ID);
         bodyCollisionGroups.Remove(id.ID);
         triggerTouchesDebris.Remove(id.ID);
         nonSolidBodies.Remove(id.ID);
@@ -621,6 +661,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
         perTriangleSurfaceBodies.Clear();
         sensorBodies.Clear();
         bodyLayers.Clear();
+        bodyRequestedLayers.Clear();
+        bodySolidFlags.Clear();
         bodyCollisionGroups.Clear();
         triggerTouchesDebris.Clear();
         nonSolidBodies.Clear();
