@@ -8,6 +8,8 @@ public sealed record SourceStaticMeshProfile
     public uint MaxTrianglesPerLeaf { get; init; } = 8;
     public int SurfaceId { get; init; }
     public SourceContents ContentsMask { get; init; } = SourceContents.Solid;
+    /// Source collision-property solid flags.
+    public SourceSolidFlags SolidFlags { get; init; }
     /// Source FSOLID_TRIGGER_TOUCH_DEBRIS: only authored trigger bodies with this flag
     /// receive trigger events from debris bodies.
     public bool TriggerTouchesDebris { get; init; }

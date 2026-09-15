@@ -33,9 +33,11 @@ public sealed class JoltHitscanQueries : IDisposable
 
         protected override bool ShouldCollide(BodyID bodyId) => bodyId.ID != unchecked((uint)ignoredBodyId) &&
             (includeSensors || !host.IsSensor(bodyId)) &&
+            (host.IsSolidBody(bodyId) || (includeSensors && host.IsSensor(bodyId))) &&
             (host.GetBodyContents(bodyId) & contentsMask) != 0;
         protected override bool ShouldCollideLocked(Body body) => body.ID.ID != unchecked((uint)ignoredBodyId) &&
             (includeSensors || !host.IsSensor(body.ID)) &&
+            (host.IsSolidBody(body.ID) || (includeSensors && host.IsSensor(body.ID))) &&
             (host.GetBodyContents(body.ID) & contentsMask) != 0;
     }
 

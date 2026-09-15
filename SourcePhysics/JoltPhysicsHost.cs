@@ -21,6 +21,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
     private readonly Dictionary<uint, SourceContents> bodyContents = new();
     private readonly Dictionary<uint, SourceObjectLayer> bodyLayers = new();
     private readonly HashSet<uint> triggerTouchesDebris = new();
+    private readonly HashSet<uint> nonSolidBodies = new();
     private readonly HashSet<uint> perTriangleSurfaceBodies = new();
     private readonly HashSet<uint> sensorBodies = new();
     private readonly List<Action<float>> preStepControllers = new();
@@ -62,6 +63,13 @@ public sealed partial class JoltPhysicsHost : IDisposable
     }
 
     private readonly Vector3 gravity;
+
+    private static SourceObjectLayer GetEffectiveLayer(SourceObjectLayer requested, SourceSolidFlags flags)
+    {
+        if ((flags & SourceSolidFlags.Trigger) != 0 || requested == SourceObjectLayer.Trigger)
+            return SourceObjectLayer.Trigger;
+        return (flags & SourceSolidFlags.NotSolid) != 0 ? SourceObjectLayer.NonSolid : requested;
+    }
 
     public void Initialize(uint maxBodies = 65536, uint numBodyMutexes = 0, uint maxBodyPairs = 65536, uint maxContactConstraints = 10240)
     {
@@ -172,7 +180,9 @@ public sealed partial class JoltPhysicsHost : IDisposable
             shape = offsetShape;
         }
         RVector3 precisePosition = position;
-        using var settings = new BodyCreationSettings(shape, precisePosition, rotation, motionType, new ObjectLayer((ushort)layer))
+        var effectiveLayer = GetEffectiveLayer(layer, profile.SolidFlags);
+        var isTrigger = effectiveLayer == SourceObjectLayer.Trigger;
+        using var settings = new BodyCreationSettings(shape, precisePosition, rotation, motionType, new ObjectLayer((ushort)effectiveLayer))
         {
             Friction = profile.Friction,
             Restitution = profile.Restitution,
@@ -184,7 +194,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
             InertiaMultiplier = profile.InertiaScale,
             MotionQuality = profile.ContinuousCollision ? MotionQuality.LinearCast : MotionQuality.Discrete,
             AllowSleeping = profile.AllowSleep,
-            IsSensor = layer == SourceObjectLayer.Trigger,
+            IsSensor = isTrigger,
             OverrideMassProperties = OverrideMassProperties.MassAndInertiaProvided
         };
         var massProperties = settings.MassPropertiesOverride;
@@ -200,11 +210,14 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodySurfaces[id.ID] = surfaceId;
         bodyProfiles[id.ID] = profile;
         bodyContents[id.ID] = profile.ContentsMask;
-        bodyLayers[id.ID] = layer;
-        if (layer == SourceObjectLayer.Trigger)
+        bodyLayers[id.ID] = effectiveLayer;
+        if ((profile.SolidFlags & SourceSolidFlags.NotSolid) != 0 && !isTrigger)
+            nonSolidBodies.Add(id.ID);
+        if (isTrigger)
         {
             sensorBodies.Add(id.ID);
-            if (profile.TriggerTouchesDebris) triggerTouchesDebris.Add(id.ID);
+            if (profile.TriggerTouchesDebris || (profile.SolidFlags & SourceSolidFlags.TriggerTouchDebris) != 0)
+                triggerTouchesDebris.Add(id.ID);
         }
         return id;
     }
@@ -247,12 +260,14 @@ public sealed partial class JoltPhysicsHost : IDisposable
         };
         using var shape = settings.Create();
         RVector3 precisePosition = position;
+        var effectiveLayer = GetEffectiveLayer(layer, profile.SolidFlags);
+        var isTrigger = effectiveLayer == SourceObjectLayer.Trigger;
         using var bodySettings = new BodyCreationSettings(shape, precisePosition, rotation,
-            MotionType.Static, new ObjectLayer((ushort)layer))
+            MotionType.Static, new ObjectLayer((ushort)effectiveLayer))
         {
             Friction = profile.Friction,
             Restitution = profile.Restitution,
-            IsSensor = layer == SourceObjectLayer.Trigger
+            IsSensor = isTrigger
         };
         var id = Bodies.CreateAndAddBody(bodySettings, Activation.DontActivate);
         if (!id.IsValid) throw new InvalidOperationException("Jolt rejected static mesh creation.");
@@ -263,17 +278,21 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodySurfaces[id.ID] = profile.SurfaceId;
         bodyProfiles[id.ID] = new SourceRigidBodyProfile { Friction = profile.Friction, Restitution = profile.Restitution };
         bodyContents[id.ID] = profile.ContentsMask;
-        bodyLayers[id.ID] = layer;
+        bodyLayers[id.ID] = effectiveLayer;
+        if ((profile.SolidFlags & SourceSolidFlags.NotSolid) != 0 && !isTrigger)
+            nonSolidBodies.Add(id.ID);
         if (profile.TriangleSurfaceIds is not null) perTriangleSurfaceBodies.Add(id.ID);
-        if (layer == SourceObjectLayer.Trigger)
+        if (isTrigger)
         {
             sensorBodies.Add(id.ID);
-            if (profile.TriggerTouchesDebris) triggerTouchesDebris.Add(id.ID);
+            if (profile.TriggerTouchesDebris || (profile.SolidFlags & SourceSolidFlags.TriggerTouchDebris) != 0)
+                triggerTouchesDebris.Add(id.ID);
         }
         return id;
     }
 
     public bool IsSensor(BodyID id) => sensorBodies.Contains(id.ID);
+    public bool IsSolidBody(BodyID id) => !nonSolidBodies.Contains(id.ID);
     private bool ShouldTouchTrigger(BodyID trigger, BodyID other)
     {
         if (!IsSensor(trigger)) return false;
@@ -521,6 +540,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         sensorBodies.Remove(id.ID);
         bodyLayers.Remove(id.ID);
         triggerTouchesDebris.Remove(id.ID);
+        nonSolidBodies.Remove(id.ID);
     }
 
     /// Adds a native Jolt constraint under the host's lifetime owner. The host
@@ -574,6 +594,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         sensorBodies.Clear();
         bodyLayers.Clear();
         triggerTouchesDebris.Clear();
+        nonSolidBodies.Clear();
         preStepControllers.Clear();
         // PhysicsSystem owns the native contact/activation listeners and the
         // native world handle. It must be destroyed after its bodies and

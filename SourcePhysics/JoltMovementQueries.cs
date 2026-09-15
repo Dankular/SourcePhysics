@@ -170,9 +170,9 @@ public sealed class JoltMovementQueries : ISourceMovementQueries, IDisposable
     {
         private readonly JoltPhysicsHost host;
         public MovementBodyFilter(JoltPhysicsHost host) => this.host = host;
-        protected override bool ShouldCollide(BodyID bodyId) => !host.IsSensor(bodyId) &&
+        protected override bool ShouldCollide(BodyID bodyId) => !host.IsSensor(bodyId) && host.IsSolidBody(bodyId) &&
             (host.GetBodyContents(bodyId) & SourceContents.MaskPlayerSolid) != 0;
-        protected override bool ShouldCollideLocked(Body body) => !host.IsSensor(body.ID) &&
+        protected override bool ShouldCollideLocked(Body body) => !host.IsSensor(body.ID) && host.IsSolidBody(body.ID) &&
             (host.GetBodyContents(body.ID) & SourceContents.MaskPlayerSolid) != 0;
     }
 }

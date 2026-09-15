@@ -103,8 +103,10 @@ public sealed class JoltProjectileQueries : IProjectileQueries, IProjectilePenet
         }
 
         protected override bool ShouldCollide(BodyID bodyId) => (includeSensors || !host.IsSensor(bodyId)) &&
+            (host.IsSolidBody(bodyId) || (includeSensors && host.IsSensor(bodyId))) &&
             (host.GetBodyContents(bodyId) & contentsMask) != 0;
         protected override bool ShouldCollideLocked(Body body) => (includeSensors || !host.IsSensor(body.ID)) &&
+            (host.IsSolidBody(body.ID) || (includeSensors && host.IsSensor(body.ID))) &&
             (host.GetBodyContents(body.ID) & contentsMask) != 0;
     }
 }

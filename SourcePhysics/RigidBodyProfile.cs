@@ -18,6 +18,9 @@ public sealed record SourceRigidBodyProfile
     public float Friction { get; init; } = 0.8f;
     public float Restitution { get; init; } = 0.001f;
     public SourceContents ContentsMask { get; init; } = SourceContents.Solid;
+    /// Source collision-property solid flags. TriggerTouchDebris is retained below as a
+    /// convenient compatibility alias for authored trigger profiles.
+    public SourceSolidFlags SolidFlags { get; init; }
     /// Source FSOLID_TRIGGER_TOUCH_DEBRIS: only authored trigger bodies with this flag
     /// receive trigger events from debris bodies.
     public bool TriggerTouchesDebris { get; init; }
