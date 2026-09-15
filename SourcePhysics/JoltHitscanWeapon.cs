@@ -125,10 +125,14 @@ public sealed class JoltHitscanWeapon : SyncScript
         for (var shot = 0; shot < results.Length; shot++)
         {
             var tracerIndex = tracerCount++;
+            // CBaseEntity::FireBullets calls RandomSeed(iSeed) for every
+            // pellet and increments iSeed after the shot. Preserve that
+            // sequence instead of sharing one random stream across pellets.
+            var shotSeed = unchecked((sourceRandomSeed + shot) & 255);
             var shotDirection = info.Flags.HasFlag(SourceFireBulletsFlags.FirstShotAccurate) && shot == 0 && info.Shots > 1
                 ? manipulator.ShotDirection
                 : manipulator.ApplySpread(info.Spread, 0f, 0f, 0f,
-                    new SourceUniformRandomStream((sourceRandomSeed & 255)).RandomFloat);
+                    new SourceUniformRandomStream(shotSeed).RandomFloat);
             var didHit = query.Cast(info.OriginMeters, shotDirection, info.DistanceMeters, out var hit);
             EmitTriggerHits(info.OriginMeters, shotDirection,
                 didHit ? info.DistanceMeters * hit.Fraction : info.DistanceMeters);
@@ -195,12 +199,26 @@ public sealed class JoltHitscanWeapon : SyncScript
         int shots, Vector3 spread, float bias, float shotBiasMin, float shotBiasMax, int sourceRandomSeed,
         bool firstShotAccurate = false, bool maskSeedToPlayerByte = true)
     {
-        var random = new SourceUniformRandomStream(maskSeedToPlayerByte ? sourceRandomSeed & 255 : sourceRandomSeed);
-        var results = FireSpread(originMeters, direction, distanceMeters, shots, spread, bias, shotBiasMin, shotBiasMax,
-            (low, high) => random.RandomFloat(low, high), firstShotAccurate);
+        if (shots < 1) throw new ArgumentOutOfRangeException(nameof(shots));
+        var manipulator = new SourceShotManipulator(direction);
+        var results = new ShotResult[shots];
+        for (var shot = 0; shot < shots; shot++)
+        {
+            var seed = unchecked(sourceRandomSeed + shot);
+            if (maskSeedToPlayerByte) seed &= 255;
+            var random = new SourceUniformRandomStream(seed);
+            var shotDirection = firstShotAccurate && shot == 0 && shots > 1
+                ? manipulator.ShotDirection
+                : manipulator.ApplySpread(spread, bias, shotBiasMin, shotBiasMax, random.RandomFloat);
+            var didHit = queries!.Cast(originMeters, shotDirection, distanceMeters, out var hit);
+            EmitTriggerHits(originMeters, shotDirection, didHit ? distanceMeters * hit.Fraction : distanceMeters);
+            if (didHit) RefineHitbox(originMeters, shotDirection, distanceMeters, ref hit);
+            results[shot] = new(didHit, shotDirection, hit);
+            if (didHit) Hit?.Invoke(hit);
+        }
         if (Recording is not null)
         {
-            for (var index = 0; index < results.Count; index++)
+            for (var index = 0; index < results.Length; index++)
             {
                 var result = results[index];
                 Recording.Capture(RecordingTick, index, sourceRandomSeed, originMeters, result.Direction,

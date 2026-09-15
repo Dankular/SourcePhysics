@@ -666,6 +666,32 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void FireBulletsReseedsSpreadForEachSourceShot()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(2048, 0, 2048, 256);
+        var weapon = new JoltHitscanWeapon();
+        weapon.Initialize(host);
+        var info = new SourceFireBulletsInfo(3, Vector3.Zero, Vector3.UnitZ,
+            new Vector3(0.1f, 0.1f, 0f), 10f, 1, Damage: 1f);
+
+        var results = weapon.FireBullets(in info, 47);
+        var manipulator = new SourceShotManipulator(info.Direction);
+        for (var shot = 0; shot < results.Count; shot++)
+        {
+            var random = new SourceUniformRandomStream((47 + shot) & 255);
+            var expected = manipulator.ApplySpread(info.Spread, 0f, 0f, 0f, random.RandomFloat);
+            Assert.Equal(expected.X, results[shot].Direction.X, 6);
+            Assert.Equal(expected.Y, results[shot].Direction.Y, 6);
+            Assert.Equal(expected.Z, results[shot].Direction.Z, 6);
+        }
+
+        var repeatedSeed = new SourceUniformRandomStream(47);
+        var repeated = manipulator.ApplySpread(info.Spread, 0f, 0f, 0f, repeatedSeed.RandomFloat);
+        Assert.NotEqual(repeated, results[1].Direction);
+    }
+
+    [Fact]
     public void FireBulletsReportsShotResponsiveTriggersBeforeTheFirstSolid()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
