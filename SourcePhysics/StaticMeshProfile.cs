@@ -26,6 +26,10 @@ public sealed record SourceStaticMeshProfile
 
     public void Validate()
     {
+        const SourceSolidFlags supportedSolidFlags = SourceSolidFlags.NotSolid |
+            SourceSolidFlags.Trigger | SourceSolidFlags.TriggerTouchDebris;
+        if (!Enum.IsDefined(CollisionGroup) || (SolidFlags & ~supportedSolidFlags) != 0)
+            throw new InvalidDataException("Static mesh profile contains an unknown Source collision state.");
         if (!float.IsFinite(Friction) || Friction < 0f)
             throw new InvalidDataException("Static mesh friction must be finite and non-negative.");
         if (!float.IsFinite(Restitution) || Restitution < 0f)

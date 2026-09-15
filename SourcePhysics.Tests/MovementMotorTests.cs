@@ -715,6 +715,19 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void ProfilesRejectUnknownSourceCollisionStateBits()
+    {
+        Assert.Throws<InvalidDataException>(() => new SourceRigidBodyProfile
+        {
+            SolidFlags = (SourceSolidFlags)0x8000
+        }.Validate());
+        Assert.Throws<InvalidDataException>(() => new SourceStaticMeshProfile
+        {
+            CollisionGroup = (SourceCollisionGroup)255
+        }.Validate());
+    }
+
+    [Fact]
     public void AuthoredCollisionPolicyCanDisableAConfiguredLayerPair()
     {
         var policy = new SourceCollisionPolicy();

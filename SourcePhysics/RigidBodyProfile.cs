@@ -31,6 +31,10 @@ public sealed record SourceRigidBodyProfile
 
     public void Validate()
     {
+        const SourceSolidFlags supportedSolidFlags = SourceSolidFlags.NotSolid |
+            SourceSolidFlags.Trigger | SourceSolidFlags.TriggerTouchDebris;
+        if (!Enum.IsDefined(CollisionGroup) || (SolidFlags & ~supportedSolidFlags) != 0)
+            throw new InvalidDataException("Rigid-body profile contains an unknown Source collision state.");
         var scalars = new[]
         {
             MassKg, InertiaScale, LinearDampingPerSecond, AngularDampingPerSecond,
