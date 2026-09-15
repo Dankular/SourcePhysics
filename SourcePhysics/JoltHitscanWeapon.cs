@@ -142,7 +142,7 @@ public sealed class JoltHitscanWeapon : SyncScript
             var result = results[shot];
             if (!result.Hit)
             {
-                Recording?.Capture(RecordingTick, shot, sourceRandomSeed, info.OriginMeters, result.Direction,
+                Recording?.Capture(RecordingTick, shot, shotSeed, info.OriginMeters, result.Direction,
                     false, result.HitData, in info, null);
                 continue;
             }
@@ -182,7 +182,7 @@ public sealed class JoltHitscanWeapon : SyncScript
                     result.Direction, in hitData);
             }
             Impact?.Invoke(impact);
-            Recording?.Capture(RecordingTick, shot, sourceRandomSeed, info.OriginMeters, result.Direction,
+            Recording?.Capture(RecordingTick, shot, shotSeed, info.OriginMeters, result.Direction,
                 true, result.HitData, in info, impact);
         }
         multiDamage.ApplyMultiDamage();
@@ -221,7 +221,9 @@ public sealed class JoltHitscanWeapon : SyncScript
             for (var index = 0; index < results.Length; index++)
             {
                 var result = results[index];
-                Recording.Capture(RecordingTick, index, sourceRandomSeed, originMeters, result.Direction,
+                var shotSeed = unchecked(sourceRandomSeed + index);
+                if (maskSeedToPlayerByte) shotSeed &= 255;
+                Recording.Capture(RecordingTick, index, shotSeed, originMeters, result.Direction,
                     result.Hit, result.HitData);
             }
             RecordingTick++;
