@@ -2659,7 +2659,7 @@ public sealed class MovementMotorTests
         host.Initialize();
         var body = host.CreateBoxBody(new Vector3(0.1f), new Vector3(0.1f, 0f, 0f),
             JoltPhysicsSharp.MotionType.Dynamic, SourceObjectLayer.Dynamic,
-            new SourceRigidBodyProfile { MassKg = 1f });
+            new SourceRigidBodyProfile { MassKg = 1f, CollisionGroup = SourceCollisionGroup.PushAway });
         var impulses = new List<SourcePhysicsImpulseEvent>();
         host.ImpulseApplied += impulses.Add;
         using var controller = new JoltPushawayController(host, new SourcePushawayProfile(),
@@ -2673,6 +2673,26 @@ public sealed class MovementMotorTests
         var impulse = Assert.Single(impulses, value => value.BodyId == body.ID);
         Assert.True(impulse.Impulse.X > 0f);
         Assert.Equal(Vector3.Zero, impulse.WorldPoint);
+    }
+
+    [Fact]
+    public void JoltPushawayControllerRequiresSourcePushawayMembership()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize();
+        var body = host.CreateBoxBody(new Vector3(0.1f), new Vector3(0.1f, 0f, 0f),
+            JoltPhysicsSharp.MotionType.Dynamic, SourceObjectLayer.Dynamic,
+            new SourceRigidBodyProfile { MassKg = 1f });
+        var impulses = new List<SourcePhysicsImpulseEvent>();
+        host.ImpulseApplied += impulses.Add;
+        using var controller = new JoltPushawayController(host, new SourcePushawayProfile(), null,
+            () => new[] { body });
+        controller.SetPlayerState(Vector3.Zero, 100f);
+        controller.RegisterFixedStep();
+
+        host.Step();
+
+        Assert.DoesNotContain(impulses, value => value.BodyId == body.ID);
     }
 
     private sealed class FlatGroundQueries : ISourceMovementQueries

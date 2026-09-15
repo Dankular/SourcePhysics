@@ -13,6 +13,8 @@ public sealed class JoltPushawayController : IDisposable
     private readonly Func<Vector3, Vector3> sourceForceToJoltImpulse;
     private readonly Func<IReadOnlyList<BodyID>> propBodies;
     private readonly Func<BodyID, bool> isRotatingDoor;
+    private readonly Func<BodyID, bool> isMultiplayerSolid;
+    private readonly Func<BodyID, bool> isPushawayEntity;
     private readonly Action<float> preStep;
     private Vector3 playerCenter;
     private float playerSpeedSourceUnitsPerSecond;
@@ -22,7 +24,9 @@ public sealed class JoltPushawayController : IDisposable
     public JoltPushawayController(JoltPhysicsHost host, SourcePushawayProfile profile,
         Func<Vector3, Vector3>? sourceForceToJoltImpulse,
         Func<IReadOnlyList<BodyID>> propBodies,
-        Func<BodyID, bool>? isRotatingDoor = null)
+        Func<BodyID, bool>? isRotatingDoor = null,
+        Func<BodyID, bool>? isMultiplayerSolid = null,
+        Func<BodyID, bool>? isPushawayEntity = null)
     {
         this.host = host ?? throw new ArgumentNullException(nameof(host));
         this.profile = profile ?? throw new ArgumentNullException(nameof(profile));
@@ -30,6 +34,9 @@ public sealed class JoltPushawayController : IDisposable
         this.sourceForceToJoltImpulse = sourceForceToJoltImpulse ?? SourcePhysicsImpulseConversion.ToJolt;
         this.propBodies = propBodies ?? throw new ArgumentNullException(nameof(propBodies));
         this.isRotatingDoor = isRotatingDoor ?? (static _ => false);
+        this.isMultiplayerSolid = isMultiplayerSolid ?? (static _ => true);
+        this.isPushawayEntity = isPushawayEntity ?? (bodyId =>
+            host.GetBodyCollisionGroup(bodyId) == SourceCollisionGroup.PushAway || this.isRotatingDoor(bodyId));
         preStep = ApplyAtFixedStep;
     }
 
@@ -61,10 +68,11 @@ public sealed class JoltPushawayController : IDisposable
         if (!playerActive || !float.IsFinite(deltaSeconds) || deltaSeconds <= 0f) return;
         foreach (var bodyId in propBodies())
         {
+            if (!isPushawayEntity(bodyId)) continue;
             if (!host.TryGetBodyMass(bodyId, out var mass)) continue;
             var propCenter = (Vector3)host.Bodies.GetRCenterOfMassPosition(bodyId);
             var sourceForce = SourcePushawayPolicy.ComputeObstacleForce(profile, propCenter, playerCenter,
-                playerSpeedSourceUnitsPerSecond, mass, multiplayerSolid: true, isRotatingDoor(bodyId));
+                playerSpeedSourceUnitsPerSecond, mass, isMultiplayerSolid(bodyId), isRotatingDoor(bodyId));
             if (sourceForce.LengthSquared() < 1e-12f) continue;
             var impulse = sourceForceToJoltImpulse(sourceForce);
             if (!IsFinite(impulse)) throw new InvalidOperationException("Source force conversion returned a non-finite Jolt impulse.");

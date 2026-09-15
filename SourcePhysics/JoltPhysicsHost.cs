@@ -21,6 +21,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
     private readonly Dictionary<uint, SourceRigidBodyProfile> bodyProfiles = new();
     private readonly Dictionary<uint, SourceContents> bodyContents = new();
     private readonly Dictionary<uint, SourceObjectLayer> bodyLayers = new();
+    private readonly Dictionary<uint, SourceCollisionGroup> bodyCollisionGroups = new();
     private readonly HashSet<uint> triggerTouchesDebris = new();
     private readonly HashSet<uint> nonSolidBodies = new();
     private readonly HashSet<uint> perTriangleSurfaceBodies = new();
@@ -219,6 +220,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyProfiles[id.ID] = profile;
         bodyContents[id.ID] = profile.ContentsMask;
         bodyLayers[id.ID] = effectiveLayer;
+        bodyCollisionGroups[id.ID] = profile.CollisionGroup;
         if ((profile.SolidFlags & SourceSolidFlags.NotSolid) != 0 && !isTrigger)
             nonSolidBodies.Add(id.ID);
         if (isTrigger)
@@ -288,6 +290,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyProfiles[id.ID] = new SourceRigidBodyProfile { Friction = profile.Friction, Restitution = profile.Restitution };
         bodyContents[id.ID] = profile.ContentsMask;
         bodyLayers[id.ID] = effectiveLayer;
+        bodyCollisionGroups[id.ID] = profile.CollisionGroup;
         if ((profile.SolidFlags & SourceSolidFlags.NotSolid) != 0 && !isTrigger)
             nonSolidBodies.Add(id.ID);
         if (profile.TriangleSurfaceIds is not null) perTriangleSurfaceBodies.Add(id.ID);
@@ -319,6 +322,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
             new CollisionSubGroupID((uint)group));
     }
     public SourceContents GetBodyContents(BodyID id) => bodyContents.TryGetValue(id.ID, out var contents) ? contents : SourceContents.Solid;
+    public SourceCollisionGroup GetBodyCollisionGroup(BodyID id) =>
+        bodyCollisionGroups.TryGetValue(id.ID, out var group) ? group : SourceCollisionGroup.None;
     public void SetBodyContents(BodyID id, SourceContents contents)
     {
         EnsureBody(id);
@@ -555,6 +560,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         perTriangleSurfaceBodies.Remove(id.ID);
         sensorBodies.Remove(id.ID);
         bodyLayers.Remove(id.ID);
+        bodyCollisionGroups.Remove(id.ID);
         triggerTouchesDebris.Remove(id.ID);
         nonSolidBodies.Remove(id.ID);
     }
@@ -609,6 +615,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         perTriangleSurfaceBodies.Clear();
         sensorBodies.Clear();
         bodyLayers.Clear();
+        bodyCollisionGroups.Clear();
         triggerTouchesDebris.Clear();
         nonSolidBodies.Clear();
         sourceGroupFilter?.Dispose();
