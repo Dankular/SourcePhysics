@@ -737,6 +737,32 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void RuntimeSourceCollisionGroupChangeAffectsSubsequentSolverPairs()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(1024, 0, 1024, 256);
+        host.CreateBoxBody(new(1f), Vector3.Zero, JoltPhysicsSharp.MotionType.Static,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                GravityFactor = 0f,
+                CollisionGroup = SourceCollisionGroup.PushAway
+            });
+        var player = host.CreateBoxBody(new(0.25f), Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Player, new SourceRigidBodyProfile { GravityFactor = 0f });
+        var contacts = 0;
+        host.Contacts.ContactAdded += value =>
+        {
+            if (value.BodyA == player.ID || value.BodyB == player.ID) contacts++;
+        };
+
+        host.SetBodyCollisionGroup(player, SourceCollisionGroup.None);
+        host.Step();
+
+        Assert.Equal(SourceCollisionGroup.None, host.GetBodyCollisionGroup(player));
+        Assert.True(contacts > 0);
+    }
+
+    [Fact]
     public void JoltStaticMeshBodyProvidesTriangleCollisionForPlayerSweep()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
