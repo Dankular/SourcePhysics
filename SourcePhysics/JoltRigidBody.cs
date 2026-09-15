@@ -76,8 +76,7 @@ public sealed class JoltRigidBody : SyncScript
             transform.M31, transform.M32, transform.M33, 0,
             0, 0, 0, 1));
         var entityPosition = EntityOriginFromCenterOfMass(position, rotation, Profile.CenterOfMassOffsetMeters);
-        Entity.Transform.Position = new Stride.Core.Mathematics.Vector3(entityPosition.X, entityPosition.Y, entityPosition.Z);
-        Entity.Transform.Rotation = new Stride.Core.Mathematics.Quaternion(rotation.X, rotation.Y, rotation.Z, rotation.W);
+        StrideTransformSync.SetWorldPose(Entity.Transform, entityPosition, rotation);
     }
 
     public override void Cancel()

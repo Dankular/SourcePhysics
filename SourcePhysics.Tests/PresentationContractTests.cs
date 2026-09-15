@@ -1,5 +1,6 @@
 using System.Numerics;
 using SourcePhysics;
+using Stride.Engine;
 using Xunit;
 
 namespace SourcePhysics.Tests;
@@ -53,5 +54,29 @@ public sealed class PresentationContractTests
         Assert.Equal(0f, forward.X, 5);
         Assert.Equal(-1f, forward.Y, 5);
         Assert.Equal(0f, forward.Z, 5);
+    }
+
+    [Fact]
+    public void StrideWorldPoseSyncWritesParentRelativeTransform()
+    {
+        var parentEntity = new Entity();
+        var childEntity = new Entity();
+        var parent = parentEntity.Transform;
+        parent.Position = new Stride.Core.Mathematics.Vector3(10f, 0f, 0f);
+        var parentRotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI * 0.5f);
+        parent.Rotation = new Stride.Core.Mathematics.Quaternion(
+            parentRotation.X, parentRotation.Y, parentRotation.Z, parentRotation.W);
+        var child = childEntity.Transform;
+        child.Parent = parent;
+        var worldPosition = new Vector3(10f, 0f, 2f);
+        var worldRotation = Quaternion.Identity;
+
+        StrideTransformSync.SetWorldPose(child, worldPosition, worldRotation);
+        child.UpdateWorldMatrix();
+
+        var actualPosition = child.WorldMatrix.TranslationVector;
+        Assert.Equal(worldPosition.X, actualPosition.X, 5);
+        Assert.Equal(worldPosition.Y, actualPosition.Y, 5);
+        Assert.Equal(worldPosition.Z, actualPosition.Z, 5);
     }
 }

@@ -43,9 +43,8 @@ public sealed class JoltCharacterMovement : SyncScript
 
     public override void Update()
     {
-        Entity.Transform.Position = ToStride(Motor.State.Position);
         var yaw = OrientationForCommand(sampledCommand);
-        Entity.Transform.Rotation = new Stride.Core.Mathematics.Quaternion(yaw.X, yaw.Y, yaw.Z, yaw.W);
+        StrideTransformSync.SetWorldPose(Entity.Transform, Motor.State.Position, yaw);
     }
 
     public override void Cancel()
@@ -71,5 +70,4 @@ public sealed class JoltCharacterMovement : SyncScript
     private float ProfileTick => PhysicsSystem.FixedStepSeconds;
     private static System.Numerics.Vector3 ToNumerics(Stride.Core.Mathematics.Vector3 value) => new(value.X, value.Y, value.Z);
     private static System.Numerics.Quaternion ToNumerics(Stride.Core.Mathematics.Quaternion value) => new(value.X, value.Y, value.Z, value.W);
-    private static Stride.Core.Mathematics.Vector3 ToStride(System.Numerics.Vector3 value) => new(value.X, value.Y, value.Z);
 }

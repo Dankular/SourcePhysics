@@ -55,7 +55,17 @@ public sealed class JoltProjectileMovement : SyncScript
     {
         if (Motor is null) return;
         var position = Motor.State.Position;
-        Entity.Transform.Position = new Stride.Core.Mathematics.Vector3(position.X, position.Y, position.Z);
+        StrideTransformSync.SetWorldPose(Entity.Transform, position, EntityWorldRotation());
+    }
+
+    private System.Numerics.Quaternion EntityWorldRotation()
+    {
+        var rotation = Entity.Transform.WorldMatrix;
+        return System.Numerics.Quaternion.CreateFromRotationMatrix(new System.Numerics.Matrix4x4(
+            rotation.M11, rotation.M12, rotation.M13, 0f,
+            rotation.M21, rotation.M22, rotation.M23, 0f,
+            rotation.M31, rotation.M32, rotation.M33, 0f,
+            0f, 0f, 0f, 1f));
     }
 
     public override void Cancel()
