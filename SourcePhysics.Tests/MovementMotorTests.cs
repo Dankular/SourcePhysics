@@ -1022,6 +1022,19 @@ public sealed class MovementMotorTests
         Assert.Equal(profile.MaxVelocity, motor.State.Position.X, 5);
     }
 
+    [Theory]
+    [InlineData(SourceMoveType.Fly)]
+    [InlineData(SourceMoveType.FlyGravity)]
+    public void StationaryGroundedTossMoveReturnsBeforeGravity(SourceMoveType moveType)
+    {
+        var motor = new SourceMovementMotor(new SourceMovementProfile(), new FlatGroundQueries(),
+            new Vector3(0f, 0.02f, 0f));
+        motor.Tick(new SourceInput(Vector2.Zero, Buttons.None, MoveType: moveType), 1f / 66f);
+        Assert.Equal(new Vector3(0f, 0.02f, 0f), motor.State.Position);
+        Assert.Equal(Vector3.Zero, motor.State.Velocity);
+        Assert.Equal(GroundState.Grounded, motor.State.Ground);
+    }
+
     [Fact]
     public void BackwardWishSpeedUsesProfileScale()
     {

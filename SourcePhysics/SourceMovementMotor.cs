@@ -326,8 +326,11 @@ public sealed class SourceMovementMotor
         var magnitude = wish.Length();
         var wishDirection = magnitude > 1e-6f ? wish / magnitude : Vector3.Zero;
         var wishSpeed = MathF.Min(profile.MaxSpeed, magnitude * profile.MaxSpeed);
-        s = s with { Ground = GroundState.Airborne, GroundBodyId = -1 };
         Accelerate(ref s, wishDirection, wishSpeed, profile.GroundAcceleration, dt, false);
+        if (s.Velocity.Y > 0f)
+            s = s with { Ground = GroundState.Airborne, GroundBodyId = -1 };
+        if (s.Ground == GroundState.Grounded && s.BaseVelocity == Vector3.Zero && s.Velocity == Vector3.Zero)
+            return;
         // FullTossMove calls CheckVelocity before applying gravity and before
         // PushEntity. Clamping only after the sweep would move the body farther
         // than Source for an over-limit restored/projectile-like velocity.
