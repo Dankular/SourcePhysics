@@ -1319,6 +1319,11 @@ public sealed class MovementMotorTests
         lowCeilingWater.AddWater(new SourceWaterVolume(
             new SourceAabb(new(-2f, -2f, -2f), new(2f, 1f, 2f)), 2f));
         Assert.Equal(SourceWaterLevel.Waist, lowCeilingWater.GetWaterLevel(Vector3.Zero, false));
+        var customProfile = new SourceMovementProfile { StandingEyeSourceUnits = 40f };
+        var customWater = new SourceMovementVolumes(movementProfile: customProfile);
+        customWater.AddWater(new SourceWaterVolume(
+            new SourceAabb(new(-2f, -2f, -2f), new(2f, 2f, 2f)), 1.1f));
+        Assert.Equal(SourceWaterLevel.Eyes, customWater.GetWaterLevel(Vector3.Zero, false));
         Assert.True(volumes.TryWaterJump(Vector3.Zero, Vector3.UnitX, out var waterJumpVelocity, out var waterJumpDuration));
         Assert.Equal(SourceUnits.ToMeters(new Vector3(100, 200, 0)), waterJumpVelocity);
         Assert.Equal(0.51f, waterJumpDuration);

@@ -14,16 +14,24 @@ public readonly record struct SourceLadderVolume(SourceAabb Bounds, Vector3 Norm
 
 public sealed class SourceMovementVolumes
 {
-    private static readonly Vector3 StandingMins = SourceUnits.ToMeters(new Vector3(-16f, -36f, -16f));
-    private static readonly Vector3 StandingMaxs = SourceUnits.ToMeters(new Vector3(16f, 36f, 16f));
-    private static readonly float StandingEye = SourceUnits.ToMeters(64f);
-    private static readonly float CrouchedEye = SourceUnits.ToMeters(28f);
+    private readonly Vector3 standingMins;
+    private readonly Vector3 standingMaxs;
+    private readonly float standingEye;
+    private readonly float crouchedEye;
     private readonly float ladderFacingDotThreshold;
     private readonly List<SourceWaterVolume> water = new();
     private readonly List<SourceWaterJumpVolume> waterJumps = new();
     private readonly List<SourceLadderVolume> ladders = new();
 
-    public SourceMovementVolumes(float ladderFacingDotThreshold = -0.707f) => this.ladderFacingDotThreshold = ladderFacingDotThreshold;
+    public SourceMovementVolumes(float ladderFacingDotThreshold = -0.707f, SourceMovementProfile? movementProfile = null)
+    {
+        this.ladderFacingDotThreshold = ladderFacingDotThreshold;
+        var profile = movementProfile ?? new SourceMovementProfile();
+        standingMins = -profile.StandingHalfExtents;
+        standingMaxs = profile.StandingHalfExtents;
+        standingEye = SourceUnits.ToMeters(profile.StandingEyeSourceUnits);
+        crouchedEye = SourceUnits.ToMeters(profile.DuckEyeSourceUnits);
+    }
 
     public void AddWater(SourceWaterVolume volume) => water.Add(volume);
     public void AddWaterJump(SourceWaterJumpVolume volume)
@@ -64,9 +72,9 @@ public sealed class SourceMovementVolumes
         // water only when the sampled point is inside its authored contents
         // region and below its authored surface.
         var center = new Vector3(position.X, position.Y, position.Z);
-        var feet = center + new Vector3(0f, StandingMins.Y + SourceUnits.ToMeters(1f), 0f);
-        var midpoint = center + new Vector3(0f, (StandingMins.Y + StandingMaxs.Y) * 0.5f, 0f);
-        var eye = center + new Vector3(0f, crouched ? CrouchedEye : StandingEye, 0f);
+        var feet = center + new Vector3(0f, standingMins.Y + SourceUnits.ToMeters(1f), 0f);
+        var midpoint = center + new Vector3(0f, (standingMins.Y + standingMaxs.Y) * 0.5f, 0f);
+        var eye = center + new Vector3(0f, crouched ? crouchedEye : standingEye, 0f);
 
         foreach (var volume in water)
         {
