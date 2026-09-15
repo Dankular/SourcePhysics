@@ -1315,6 +1315,10 @@ public sealed class MovementMotorTests
         Assert.Equal(SourceWaterLevel.Eyes, volumes.GetWaterLevel(Vector3.Zero, false));
         Assert.Equal(SourceUnits.ToMeters(new Vector3(100f, 100f, 0f)),
             volumes.GetWaterBaseVelocity(Vector3.Zero, SourceWaterLevel.Waist));
+        var lowCeilingWater = new SourceMovementVolumes();
+        lowCeilingWater.AddWater(new SourceWaterVolume(
+            new SourceAabb(new(-2f, -2f, -2f), new(2f, 1f, 2f)), 2f));
+        Assert.Equal(SourceWaterLevel.Waist, lowCeilingWater.GetWaterLevel(Vector3.Zero, false));
         Assert.True(volumes.TryWaterJump(Vector3.Zero, Vector3.UnitX, out var waterJumpVelocity, out var waterJumpDuration));
         Assert.Equal(SourceUnits.ToMeters(new Vector3(100, 200, 0)), waterJumpVelocity);
         Assert.Equal(0.51f, waterJumpDuration);

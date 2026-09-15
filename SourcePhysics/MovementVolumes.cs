@@ -14,6 +14,10 @@ public readonly record struct SourceLadderVolume(SourceAabb Bounds, Vector3 Norm
 
 public sealed class SourceMovementVolumes
 {
+    private static readonly Vector3 StandingMins = SourceUnits.ToMeters(new Vector3(-16f, -36f, -16f));
+    private static readonly Vector3 StandingMaxs = SourceUnits.ToMeters(new Vector3(16f, 36f, 16f));
+    private static readonly float StandingEye = SourceUnits.ToMeters(64f);
+    private static readonly float CrouchedEye = SourceUnits.ToMeters(28f);
     private readonly float ladderFacingDotThreshold;
     private readonly List<SourceWaterVolume> water = new();
     private readonly List<SourceWaterJumpVolume> waterJumps = new();
@@ -31,15 +35,7 @@ public sealed class SourceMovementVolumes
 
     public SourceWaterLevel GetWaterLevel(Vector3 position, bool crouched)
     {
-        foreach (var volume in water)
-        {
-            if (!volume.Bounds.Contains(position)) continue;
-            var depth = volume.SurfaceHeight - position.Y;
-            if (depth >= 1.6256f) return SourceWaterLevel.Eyes;
-            if (depth >= (crouched ? 0.7112f : 0.9144f)) return SourceWaterLevel.Waist;
-            if (depth > 0f) return SourceWaterLevel.Feet;
-        }
-        return SourceWaterLevel.Dry;
+        return SampleWater(position, crouched).Level;
     }
 
     public Vector3 GetWaterBaseVelocity(Vector3 position, SourceWaterLevel waterLevel)
@@ -47,7 +43,8 @@ public sealed class SourceMovementVolumes
         if (waterLevel == SourceWaterLevel.Dry) return Vector3.Zero;
         foreach (var volume in water)
         {
-            if (!volume.Bounds.Contains(position)) continue;
+            var sample = SampleWater(position, false);
+            if (sample.Level == SourceWaterLevel.Dry || sample.Volume != volume) continue;
             var direction = Vector3.Zero;
             if (volume.Current.HasFlag(SourceWaterCurrent.Current0)) direction.X += 1f;
             if (volume.Current.HasFlag(SourceWaterCurrent.Current90)) direction.Z += 1f;
@@ -59,6 +56,34 @@ public sealed class SourceMovementVolumes
         }
         return Vector3.Zero;
     }
+
+    private (SourceWaterLevel Level, SourceWaterVolume? Volume) SampleWater(Vector3 position, bool crouched)
+    {
+        // This is the Source CheckWater sequence: feet just above the hull
+        // bottom, hull midpoint, then the current view/eye point. A volume is
+        // water only when the sampled point is inside its authored contents
+        // region and below its authored surface.
+        var center = new Vector3(position.X, position.Y, position.Z);
+        var feet = center + new Vector3(0f, StandingMins.Y + SourceUnits.ToMeters(1f), 0f);
+        var midpoint = center + new Vector3(0f, (StandingMins.Y + StandingMaxs.Y) * 0.5f, 0f);
+        var eye = center + new Vector3(0f, crouched ? CrouchedEye : StandingEye, 0f);
+
+        foreach (var volume in water)
+        {
+            if (!ContainsWater(volume, feet)) continue;
+            var level = SourceWaterLevel.Feet;
+            if (ContainsWater(volume, midpoint))
+            {
+                level = SourceWaterLevel.Waist;
+                if (ContainsWater(volume, eye)) level = SourceWaterLevel.Eyes;
+            }
+            return (level, volume);
+        }
+        return (SourceWaterLevel.Dry, null);
+    }
+
+    private static bool ContainsWater(SourceWaterVolume volume, Vector3 point) =>
+        volume.Bounds.Contains(point) && point.Y <= volume.SurfaceHeight;
 
     public bool TryLadder(Vector3 position, Vector3 direction, out Vector3 normal, out int bodyId)
     {
