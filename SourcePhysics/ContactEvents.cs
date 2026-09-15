@@ -11,9 +11,11 @@ public readonly record struct SourceTriggerEvent(uint TriggerBody, uint OtherBod
     Vector3 Normal = default);
 public readonly record struct SourceTriggerRemovedEvent(uint TriggerBody, uint OtherBody);
 
+public delegate SourceSurface SourceContactSurfaceResolver(in Body body, SubShapeID subShapeId);
+
 public sealed class SourceContactRouter
 {
-    private readonly Func<BodyID, SourceSurface> surfaceResolver;
+    private readonly SourceContactSurfaceResolver surfaceResolver;
     private readonly SourceContactMaterialPolicy materialPolicy;
     private readonly Func<BodyID, bool> sensorResolver;
     public event Action<SourceContactEvent>? ContactAdded;
@@ -31,6 +33,12 @@ public sealed class SourceContactRouter
 
     public SourceContactRouter(Func<BodyID, SourceSurface> surfaceResolver,
         SourceContactMaterialPolicy? materialPolicy = null, Func<BodyID, bool>? sensorResolver = null)
+        : this((in Body body, SubShapeID _) => surfaceResolver(body.ID), materialPolicy, sensorResolver)
+    {
+    }
+
+    public SourceContactRouter(SourceContactSurfaceResolver surfaceResolver,
+        SourceContactMaterialPolicy? materialPolicy = null, Func<BodyID, bool>? sensorResolver = null)
     {
         this.surfaceResolver = surfaceResolver;
         this.materialPolicy = materialPolicy ?? new SourceContactMaterialPolicy();
@@ -39,7 +47,7 @@ public sealed class SourceContactRouter
 
     internal void OnAdded(PhysicsSystem system, in Body a, in Body b, in ContactManifold manifold, ref ContactSettings settings)
     {
-        ApplySourceCombine(a.ID, b.ID, ref settings);
+        ApplySourceCombine(a, b, manifold.SubShapeID1, manifold.SubShapeID2, ref settings);
         var contact = CreateEvent(a, b, manifold, false);
         added.Enqueue(contact);
         QueueTrigger(contact);
@@ -47,7 +55,7 @@ public sealed class SourceContactRouter
 
     internal void OnPersisted(PhysicsSystem system, in Body a, in Body b, in ContactManifold manifold, ref ContactSettings settings)
     {
-        ApplySourceCombine(a.ID, b.ID, ref settings);
+        ApplySourceCombine(a, b, manifold.SubShapeID1, manifold.SubShapeID2, ref settings);
         var contact = CreateEvent(a, b, manifold, true);
         persisted.Enqueue(contact);
         QueueTrigger(contact);
@@ -59,9 +67,11 @@ public sealed class SourceContactRouter
         return new(a.ID.ID, b.ID.ID, point, persisted, manifold.WorldSpaceNormal, manifold.PenetrationDepth);
     }
 
-    private void ApplySourceCombine(BodyID a, BodyID b, ref ContactSettings settings)
+    private void ApplySourceCombine(in Body a, in Body b, SubShapeID subShapeA, SubShapeID subShapeB,
+        ref ContactSettings settings)
     {
-        var first = surfaceResolver(a); var second = surfaceResolver(b);
+        var first = surfaceResolver(in a, subShapeA);
+        var second = surfaceResolver(in b, subShapeB);
         settings.CombinedFriction = materialPolicy.GetFriction(first, second);
         settings.CombinedRestitution = materialPolicy.GetRestitution(first, second);
     }

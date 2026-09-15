@@ -52,7 +52,9 @@ public sealed partial class JoltPhysicsHost : IDisposable
         SolverProfile = solverProfile ?? new JoltSolverProfile();
         CollisionPolicy = collisionPolicy ?? new SourceCollisionPolicy();
         ContactMaterialPolicy = contactMaterialPolicy ?? new SourceContactMaterialPolicy();
-        Contacts = new SourceContactRouter(GetBodySurface, ContactMaterialPolicy, IsSensor);
+        Contacts = new SourceContactRouter(
+            (in Body body, SubShapeID subShapeId) => GetBodySurface(in body, subShapeId, out _),
+            ContactMaterialPolicy, IsSensor);
         // Gravity is exposed by SourceMovementProfile.Gravity in Jolt's meter units.
         gravity = new Vector3(0f, -profile.Gravity, 0f);
     }
@@ -468,6 +470,18 @@ public sealed partial class JoltPhysicsHost : IDisposable
             if (shape is not null && shape.SubType == ShapeSubType.Mesh)
                 surfaceId = unchecked((int)GetMeshTriangleUserData(shape.Handle, subShapeId.Value));
         }
+        return Surfaces.Get(surfaceId);
+    }
+
+    // Contact callbacks already provide a locked Body view. Resolve mesh
+    // triangle metadata through it instead of reacquiring BodyInterface's
+    // lock from inside Jolt's simulation callback.
+    internal SourceSurface GetBodySurface(in Body body, SubShapeID subShapeId, out int surfaceId)
+    {
+        surfaceId = bodySurfaces.TryGetValue(body.ID.ID, out var storedId) ? storedId : 0;
+        if (perTriangleSurfaceBodies.Contains(body.ID.ID) && body.Shape is { } shape &&
+            shape.SubType == ShapeSubType.Mesh)
+            surfaceId = unchecked((int)GetMeshTriangleUserData(shape.Handle, subShapeId.Value));
         return Surfaces.Get(surfaceId);
     }
 

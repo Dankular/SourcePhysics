@@ -510,6 +510,49 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void JoltContactCombineUsesTheContactManifoldTriangleSurface()
+    {
+        var frictionPair = default((string First, string Second));
+        var restitutionPair = default((string First, string Second));
+        var policy = new SourceContactMaterialPolicy
+        {
+            CombineFriction = (first, second) =>
+            {
+                frictionPair = (first.Name, second.Name);
+                return 0.5f;
+            },
+            CombineRestitution = (first, second) =>
+            {
+                restitutionPair = (first.Name, second.Name);
+                return 0.25f;
+            }
+        };
+        using var host = new JoltPhysicsHost(new SourceMovementProfile(), contactMaterialPolicy: policy);
+        host.Initialize(2048, 0, 2048, 256);
+        host.Surfaces.Register(17, new SourceSurface("triangle", 0.15f, 0.1f));
+        host.Surfaces.Register(23, new SourceSurface("dynamic", 0.85f, 0.7f));
+        var vertices = new[]
+        {
+            new Vector3(-5f, 0f, -5f), new Vector3(5f, 0f, -5f), new Vector3(5f, 0f, 5f),
+            new Vector3(-5f, 0f, 5f)
+        };
+        host.CreateStaticMeshBody(vertices, new[] { Triangle(0, 1, 2), Triangle(0, 2, 3) },
+            Vector3.Zero, SourceObjectLayer.World,
+            new SourceStaticMeshProfile { SurfaceId = 0, TriangleSurfaceIds = new[] { 17, 17 } });
+        host.CreateBoxBody(new(0.25f), new(0f, 1f, 0f), JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { GravityFactor = 1f }, 23);
+
+        for (var tick = 0; tick < 90 && frictionPair.First is null; tick++) host.Step();
+
+        Assert.True(IsTriangleDynamicPair(frictionPair));
+        Assert.True(IsTriangleDynamicPair(restitutionPair));
+
+        static bool IsTriangleDynamicPair((string First, string Second) pair) =>
+            (pair.First == "triangle" && pair.Second == "dynamic") ||
+            (pair.First == "dynamic" && pair.Second == "triangle");
+    }
+
+    [Fact]
     public void TriggerLayerGeneratesContactWithoutBlockingDynamicBody()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
