@@ -18,6 +18,7 @@ public sealed class SourceContactRouter
     private readonly SourceContactSurfaceResolver surfaceResolver;
     private readonly SourceContactMaterialPolicy materialPolicy;
     private readonly Func<BodyID, bool> sensorResolver;
+    private readonly Func<BodyID, BodyID, bool> triggerTouchResolver;
     public event Action<SourceContactEvent>? ContactAdded;
     public event Action<SourceContactEvent>? ContactPersisted;
     public event Action<SourceContactRemovedEvent>? ContactRemoved;
@@ -32,17 +33,20 @@ public sealed class SourceContactRouter
     private readonly ConcurrentQueue<SourceTriggerRemovedEvent> triggerExited = new();
 
     public SourceContactRouter(Func<BodyID, SourceSurface> surfaceResolver,
-        SourceContactMaterialPolicy? materialPolicy = null, Func<BodyID, bool>? sensorResolver = null)
-        : this((in Body body, SubShapeID _) => surfaceResolver(body.ID), materialPolicy, sensorResolver)
+        SourceContactMaterialPolicy? materialPolicy = null, Func<BodyID, bool>? sensorResolver = null,
+        Func<BodyID, BodyID, bool>? triggerTouchResolver = null)
+        : this((in Body body, SubShapeID _) => surfaceResolver(body.ID), materialPolicy, sensorResolver, triggerTouchResolver)
     {
     }
 
     public SourceContactRouter(SourceContactSurfaceResolver surfaceResolver,
-        SourceContactMaterialPolicy? materialPolicy = null, Func<BodyID, bool>? sensorResolver = null)
+        SourceContactMaterialPolicy? materialPolicy = null, Func<BodyID, bool>? sensorResolver = null,
+        Func<BodyID, BodyID, bool>? triggerTouchResolver = null)
     {
         this.surfaceResolver = surfaceResolver;
         this.materialPolicy = materialPolicy ?? new SourceContactMaterialPolicy();
         this.sensorResolver = sensorResolver ?? (static _ => false);
+        this.triggerTouchResolver = triggerTouchResolver ?? (static (_, _) => true);
     }
 
     internal void OnAdded(PhysicsSystem system, in Body a, in Body b, in ContactManifold manifold, ref ContactSettings settings)
@@ -78,19 +82,23 @@ public sealed class SourceContactRouter
     internal void OnRemoved(PhysicsSystem _, ref SubShapeIDPair pair)
     {
         removed.Enqueue(new(pair.Body1ID.ID, pair.Body2ID.ID));
-        if (sensorResolver(pair.Body1ID)) triggerExited.Enqueue(new(pair.Body1ID.ID, pair.Body2ID.ID));
-        else if (sensorResolver(pair.Body2ID)) triggerExited.Enqueue(new(pair.Body2ID.ID, pair.Body1ID.ID));
+        if (sensorResolver(pair.Body1ID) && triggerTouchResolver(pair.Body1ID, pair.Body2ID))
+            triggerExited.Enqueue(new(pair.Body1ID.ID, pair.Body2ID.ID));
+        else if (sensorResolver(pair.Body2ID) && triggerTouchResolver(pair.Body2ID, pair.Body1ID))
+            triggerExited.Enqueue(new(pair.Body2ID.ID, pair.Body1ID.ID));
     }
 
     private void QueueTrigger(in SourceContactEvent contact)
     {
         if (sensorResolver(new BodyID(contact.BodyA)))
         {
+            if (!triggerTouchResolver(new BodyID(contact.BodyA), new BodyID(contact.BodyB))) return;
             var eventValue = new SourceTriggerEvent(contact.BodyA, contact.BodyB, contact.ContactPoint, contact.Persisted, contact.Normal);
             if (contact.Persisted) triggerStayed.Enqueue(eventValue); else triggerEntered.Enqueue(eventValue);
         }
         else if (sensorResolver(new BodyID(contact.BodyB)))
         {
+            if (!triggerTouchResolver(new BodyID(contact.BodyB), new BodyID(contact.BodyA))) return;
             var eventValue = new SourceTriggerEvent(contact.BodyB, contact.BodyA, contact.ContactPoint, contact.Persisted, -contact.Normal);
             if (contact.Persisted) triggerStayed.Enqueue(eventValue); else triggerEntered.Enqueue(eventValue);
         }

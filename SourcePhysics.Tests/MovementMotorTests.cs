@@ -617,6 +617,54 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void TriggerLayerSuppressesDebrisUnlessAuthoredToTouchDebris()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(1024, 0, 1024, 256);
+        var trigger = host.CreateBoxBody(new(1f), Vector3.Zero, JoltPhysicsSharp.MotionType.Static,
+            SourceObjectLayer.Trigger);
+        host.CreateBoxBody(new(0.25f), new(0f, 0.5f, 0f), JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Debris, new SourceRigidBodyProfile
+            {
+                ContentsMask = SourceContents.Debris,
+                GravityFactor = 0f
+            });
+        var triggerEvents = 0;
+        host.Contacts.TriggerEntered += value =>
+        {
+            if (value.TriggerBody == trigger.ID) triggerEvents++;
+        };
+
+        host.Step();
+
+        Assert.Equal(0, triggerEvents);
+    }
+
+    [Fact]
+    public void TriggerLayerTouchesDebrisWhenSourceFlagIsAuthored()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(1024, 0, 1024, 256);
+        var trigger = host.CreateBoxBody(new(1f), Vector3.Zero, JoltPhysicsSharp.MotionType.Static,
+            SourceObjectLayer.Trigger, new SourceRigidBodyProfile { TriggerTouchesDebris = true });
+        host.CreateBoxBody(new(0.25f), new(0f, 0.5f, 0f), JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Debris, new SourceRigidBodyProfile
+            {
+                ContentsMask = SourceContents.Debris,
+                GravityFactor = 0f
+            });
+        var triggerEvents = 0;
+        host.Contacts.TriggerEntered += value =>
+        {
+            if (value.TriggerBody == trigger.ID) triggerEvents++;
+        };
+
+        host.Step();
+
+        Assert.True(triggerEvents > 0);
+    }
+
+    [Fact]
     public void AuthoredCollisionPolicyCanDisableAConfiguredLayerPair()
     {
         var policy = new SourceCollisionPolicy();

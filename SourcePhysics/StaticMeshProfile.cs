@@ -8,6 +8,9 @@ public sealed record SourceStaticMeshProfile
     public uint MaxTrianglesPerLeaf { get; init; } = 8;
     public int SurfaceId { get; init; }
     public SourceContents ContentsMask { get; init; } = SourceContents.Solid;
+    /// Source FSOLID_TRIGGER_TOUCH_DEBRIS: only authored trigger bodies with this flag
+    /// receive trigger events from debris bodies.
+    public bool TriggerTouchesDebris { get; init; }
     /// Source VPhysics game-data/user-data identity carried by the static body.
     public ulong UserData { get; init; }
     /// <summary>

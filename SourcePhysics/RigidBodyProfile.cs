@@ -18,6 +18,9 @@ public sealed record SourceRigidBodyProfile
     public float Friction { get; init; } = 0.8f;
     public float Restitution { get; init; } = 0.001f;
     public SourceContents ContentsMask { get; init; } = SourceContents.Solid;
+    /// Source FSOLID_TRIGGER_TOUCH_DEBRIS: only authored trigger bodies with this flag
+    /// receive trigger events from debris bodies.
+    public bool TriggerTouchesDebris { get; init; }
     /// Source VPhysics game-data/user-data identity carried by the body.
     public ulong UserData { get; init; }
 

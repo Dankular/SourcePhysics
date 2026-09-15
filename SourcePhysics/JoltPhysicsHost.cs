@@ -19,6 +19,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
     private readonly Dictionary<uint, int> bodySurfaces = new();
     private readonly Dictionary<uint, SourceRigidBodyProfile> bodyProfiles = new();
     private readonly Dictionary<uint, SourceContents> bodyContents = new();
+    private readonly Dictionary<uint, SourceObjectLayer> bodyLayers = new();
+    private readonly HashSet<uint> triggerTouchesDebris = new();
     private readonly HashSet<uint> perTriangleSurfaceBodies = new();
     private readonly HashSet<uint> sensorBodies = new();
     private readonly List<Action<float>> preStepControllers = new();
@@ -54,7 +56,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         ContactMaterialPolicy = contactMaterialPolicy ?? new SourceContactMaterialPolicy();
         Contacts = new SourceContactRouter(
             (in Body body, SubShapeID subShapeId) => GetBodySurface(in body, subShapeId, out _),
-            ContactMaterialPolicy, IsSensor);
+            ContactMaterialPolicy, IsSensor, ShouldTouchTrigger);
         // Gravity is exposed by SourceMovementProfile.Gravity in Jolt's meter units.
         gravity = new Vector3(0f, -profile.Gravity, 0f);
     }
@@ -198,7 +200,12 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodySurfaces[id.ID] = surfaceId;
         bodyProfiles[id.ID] = profile;
         bodyContents[id.ID] = profile.ContentsMask;
-        if (layer == SourceObjectLayer.Trigger) sensorBodies.Add(id.ID);
+        bodyLayers[id.ID] = layer;
+        if (layer == SourceObjectLayer.Trigger)
+        {
+            sensorBodies.Add(id.ID);
+            if (profile.TriggerTouchesDebris) triggerTouchesDebris.Add(id.ID);
+        }
         return id;
     }
 
@@ -256,12 +263,26 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodySurfaces[id.ID] = profile.SurfaceId;
         bodyProfiles[id.ID] = new SourceRigidBodyProfile { Friction = profile.Friction, Restitution = profile.Restitution };
         bodyContents[id.ID] = profile.ContentsMask;
+        bodyLayers[id.ID] = layer;
         if (profile.TriangleSurfaceIds is not null) perTriangleSurfaceBodies.Add(id.ID);
-        if (layer == SourceObjectLayer.Trigger) sensorBodies.Add(id.ID);
+        if (layer == SourceObjectLayer.Trigger)
+        {
+            sensorBodies.Add(id.ID);
+            if (profile.TriggerTouchesDebris) triggerTouchesDebris.Add(id.ID);
+        }
         return id;
     }
 
     public bool IsSensor(BodyID id) => sensorBodies.Contains(id.ID);
+    private bool ShouldTouchTrigger(BodyID trigger, BodyID other)
+    {
+        if (!IsSensor(trigger)) return false;
+        if (bodyLayers.TryGetValue(other.ID, out var otherLayer) && otherLayer == SourceObjectLayer.Trigger)
+            return false;
+        var otherIsDebris = bodyLayers.TryGetValue(other.ID, out otherLayer) && otherLayer == SourceObjectLayer.Debris;
+        otherIsDebris |= (GetBodyContents(other) & SourceContents.Debris) != 0;
+        return !otherIsDebris || triggerTouchesDebris.Contains(trigger.ID);
+    }
     public SourceContents GetBodyContents(BodyID id) => bodyContents.TryGetValue(id.ID, out var contents) ? contents : SourceContents.Solid;
     public void SetBodyContents(BodyID id, SourceContents contents)
     {
@@ -498,6 +519,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyContents.Remove(id.ID);
         perTriangleSurfaceBodies.Remove(id.ID);
         sensorBodies.Remove(id.ID);
+        bodyLayers.Remove(id.ID);
+        triggerTouchesDebris.Remove(id.ID);
     }
 
     /// Adds a native Jolt constraint under the host's lifetime owner. The host
@@ -549,6 +572,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyContents.Clear();
         perTriangleSurfaceBodies.Clear();
         sensorBodies.Clear();
+        bodyLayers.Clear();
+        triggerTouchesDebris.Clear();
         preStepControllers.Clear();
         // PhysicsSystem owns the native contact/activation listeners and the
         // native world handle. It must be destroyed after its bodies and
