@@ -37,7 +37,8 @@ public sealed class WeaponRecording
         bool hit, HitscanHit hitData, in SourceFireBulletsInfo info, SourceFireBulletsImpact? impact)
     {
         Frames.Add(new(tick, shotIndex, randomSeed, origin, direction, hit, hitData,
-            info.AmmoType, info.PlayerDamage, impact?.Damage ?? 0f, info.DamageType, info.Flags,
+            info.AmmoType, info.PlayerDamage, impact?.Damage ?? 0f,
+            impact?.DamageType ?? info.DamageType, info.Flags,
             info.DamageForceScale, info.PrimaryAttack, info.TracerFrequency,
             impact?.HitWater ?? false, impact?.SuppressSurfaceImpact ?? false,
             impact?.DamageSuppressed ?? false, impact?.DamageForce ?? default));

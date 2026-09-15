@@ -646,7 +646,7 @@ public sealed class MovementMotorTests
         Assert.Equal(2, impacts.Count);
         Assert.All(impacts, impact => Assert.Equal(25f, impact.Damage));
         Assert.All(impacts, impact => Assert.Equal(3, impact.AmmoType));
-        Assert.All(impacts, impact => Assert.Equal(0x1234, impact.DamageType));
+        Assert.All(impacts, impact => Assert.Equal(0x3234, impact.DamageType));
         Assert.All(impacts, impact => Assert.Equal(0.5f, impact.DamageForceScale));
         Assert.All(impacts, impact => Assert.True(impact.PrimaryAttack));
         Assert.All(impacts, impact => Assert.Equal(new Vector3(0f, 0f, 50f), impact.DamageForce));
@@ -656,13 +656,14 @@ public sealed class MovementMotorTests
         Assert.Equal(2, recording.Frames.Count);
         Assert.Equal(3, recording.Frames[0].AmmoType);
         Assert.Equal(25f, recording.Frames[0].AppliedDamage);
-        Assert.Equal(0x1234, recording.Frames[0].DamageType);
+        Assert.Equal(0x3234, recording.Frames[0].DamageType);
         Assert.Equal(SourceFireBulletsFlags.FirstShotAccurate, recording.Frames[0].Flags);
         Assert.Equal(new Vector3(0f, 0f, 50f), recording.Frames[0].DamageForce);
         Assert.Equal(2, damageTarget.TraceCount);
         Assert.Equal(1, damageTarget.TakeDamageCount);
         Assert.Equal(50f, damageTarget.LastDamage.Damage);
         Assert.Equal(new Vector3(0f, 0f, 100f), damageTarget.LastDamage.DamageForce);
+        Assert.Equal(0x3234, damageTarget.LastDamage.DamageType);
     }
 
     [Fact]
@@ -693,6 +694,37 @@ public sealed class MovementMotorTests
         var repeatedSeed = new SourceUniformRandomStream(47);
         var repeated = manipulator.ApplySpread(info.Spread, 0f, 0f, 0f, repeatedSeed.RandomFloat);
         Assert.NotEqual(repeated, results[1].Direction);
+    }
+
+    [Fact]
+    public void FireBulletsUsesTitleAmmoDefinitionForPlayerDamageAndDamageType()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(2048, 0, 2048, 256);
+        host.CreateBoxBody(new(1f, 1f, 0.1f), new(0f, 0f, 3f),
+            JoltPhysicsSharp.MotionType.Static, SourceObjectLayer.World);
+        var target = new DamageTargetProbe();
+        var weapon = new JoltHitscanWeapon();
+        weapon.Initialize(host);
+        weapon.IsPlayerTarget = _ => true;
+        weapon.DamageTargetResolver = _ => target;
+        weapon.AmmoDefinitionResolver = _ => new SourceAmmoDefinition(0x10,
+            SourceAmmoFlags.InterpretPlayerDamageAsDamageToPlayer | SourceAmmoFlags.ForceDropIfCarried, 33);
+        HitscanHit? forceDropHit = null;
+        weapon.ForceDropIfCarried = hit => forceDropHit = hit;
+        var impacts = new List<SourceFireBulletsImpact>();
+        weapon.Impact += impacts.Add;
+
+        var info = new SourceFireBulletsInfo(1, Vector3.Zero, Vector3.UnitZ,
+            Vector3.Zero, 10f, 4, Damage: 0f, PlayerDamage: 0, DamageType: 0x1);
+        weapon.FireBullets(in info, 3);
+
+        var impact = Assert.Single(impacts);
+        Assert.Equal(33f, impact.Damage);
+        Assert.Equal(0x2010, impact.DamageType);
+        Assert.Equal(33f, target.LastDamage.Damage);
+        Assert.Equal(0x2010, target.LastDamage.DamageType);
+        Assert.NotNull(forceDropHit);
     }
 
     [Fact]

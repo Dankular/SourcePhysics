@@ -26,6 +26,14 @@ public sealed class JoltHitscanWeapon : SyncScript
     /// Resolves the title AmmoDef::DamageForce value for an ammo index. The
     /// integer index is intentionally not mapped to a guessed ammo table.
     public Func<int, float>? BulletForceResolver { get; set; }
+    /// Resolves the title AmmoDef fields consumed by CBaseEntity::FireBullets.
+    /// A null resolver leaves the already-resolved fields on SourceFireBulletsInfo
+    /// unchanged; no ammo-table defaults are inferred here.
+    public Func<int, SourceAmmoDefinition?>? AmmoDefinitionResolver { get; set; }
+    /// Title-owned equivalent of Pickup_ForcePlayerToDropThisObject. It is
+    /// invoked only after a non-suppressed Source bullet impact whose AmmoDef
+    /// carries AMMO_FORCE_DROP_IF_CARRIED.
+    public Action<HitscanHit>? ForceDropIfCarried { get; set; }
     /// Resolves a traced body/hitbox to the title's damage target. When set,
     /// FireBullets executes Source TraceAttack/ApplyMultiDamage ordering.
     public Func<HitscanHit, ISourceDamageTarget?>? DamageTargetResolver { get; set; }
@@ -119,6 +127,15 @@ public sealed class JoltHitscanWeapon : SyncScript
         if (!float.IsFinite(info.DamageForceScale) || info.DamageForceScale < 0f)
             throw new ArgumentOutOfRangeException(nameof(info), "Damage force scale must be non-negative and finite.");
         var query = queries ?? throw new InvalidOperationException("The weapon must be started before firing.");
+        var ammoDefinition = AmmoDefinitionResolver?.Invoke(info.AmmoType);
+        var resolvedPlayerDamage = info.PlayerDamage;
+        var resolvedDamageType = ammoDefinition?.DamageType ?? info.DamageType;
+        if (ammoDefinition is { } definition && resolvedPlayerDamage == 0 &&
+            definition.Flags.HasFlag(SourceAmmoFlags.InterpretPlayerDamageAsDamageToPlayer))
+            resolvedPlayerDamage = definition.PlayerDamage;
+        if (resolvedPlayerDamage < 0)
+            throw new InvalidOperationException("AmmoDefinitionResolver returned a negative player damage.");
+        var resolvedInfo = info with { PlayerDamage = resolvedPlayerDamage, DamageType = resolvedDamageType };
         var manipulator = new SourceShotManipulator(info.Direction);
         var results = new ShotResult[info.Shots];
         var multiDamage = new SourceMultiDamageAccumulator();
@@ -143,7 +160,7 @@ public sealed class JoltHitscanWeapon : SyncScript
             if (!result.Hit)
             {
                 Recording?.Capture(RecordingTick, shot, shotSeed, info.OriginMeters, result.Direction,
-                    false, result.HitData, in info, null);
+                    false, result.HitData, in resolvedInfo, null);
                 continue;
             }
             var startedInWater = IsWaterPoint?.Invoke(info.OriginMeters) ?? false;
@@ -156,8 +173,8 @@ public sealed class JoltHitscanWeapon : SyncScript
                 result.HitData.HitGroup, result.HitData.Hitbox, result.HitData.PhysicsBone,
                 result.HitData.Contents);
             var isPlayer = IsPlayerTarget?.Invoke(result.HitData) ?? false;
-            var damage = suppressDamage ? 0f : isPlayer && info.PlayerDamage != 0
-                ? info.PlayerDamage
+            var damage = suppressDamage ? 0f : isPlayer && resolvedPlayerDamage != 0
+                ? resolvedPlayerDamage
                 : info.Damage != 0f
                     ? info.Damage
                     : DamageResolver?.Invoke(info.AmmoType, result.HitData) ?? 0f;
@@ -168,22 +185,29 @@ public sealed class JoltHitscanWeapon : SyncScript
                 throw new InvalidOperationException("BulletForceResolver returned an invalid force value.");
             var damageForce = suppressDamage ? Vector3.Zero :
                 Vector3.Normalize(result.Direction) * bulletForce * info.DamageForceScale;
+            var explicitDamage = !suppressDamage && (info.Damage != 0f || (isPlayer && resolvedPlayerDamage != 0));
+            var actualDamageType = resolvedDamageType | (explicitDamage
+                ? damage > 16f ? 1 << 13 : 1 << 12
+                : 0);
             var impact = new SourceFireBulletsImpact(shot, result.HitData, metadata, damage, info.AmmoType,
-                info.DamageType, info.Flags, info.DamageForceScale, isPlayer,
+                actualDamageType, info.Flags, info.DamageForceScale, isPlayer,
                 info.TracerFrequency != 0 && tracerIndex % info.TracerFrequency == 0,
                 info.PrimaryAttack, waterHit, suppressImpact, suppressDamage, damageForce);
             if (!suppressDamage && DamageTargetResolver?.Invoke(result.HitData) is { } target)
             {
                 var hitData = result.HitData;
                 var damageInfo = new SourceDamageInfo(damage, damage, damageForce, result.HitData.Position,
-                    info.OriginMeters, info.DamageType, info.AmmoType);
+                    info.OriginMeters, actualDamageType, info.AmmoType);
                 var targetId = DamageTargetIdResolver?.Invoke(result.HitData) ?? result.HitData.BodyId;
                 multiDamage.DispatchTraceAttack(targetId, target, in damageInfo,
                     result.Direction, in hitData);
             }
+            if (!suppressDamage && ammoDefinition is { } resolvedAmmo &&
+                resolvedAmmo.Flags.HasFlag(SourceAmmoFlags.ForceDropIfCarried))
+                ForceDropIfCarried?.Invoke(result.HitData);
             Impact?.Invoke(impact);
             Recording?.Capture(RecordingTick, shot, shotSeed, info.OriginMeters, result.Direction,
-                true, result.HitData, in info, impact);
+                true, result.HitData, in resolvedInfo, impact);
         }
         multiDamage.ApplyMultiDamage();
         if (Recording is not null) RecordingTick++;

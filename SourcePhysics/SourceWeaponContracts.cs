@@ -25,6 +25,22 @@ public enum SourceFireBulletsFlags
     TemporaryDangerSound = 0x8
 }
 
+[Flags]
+public enum SourceAmmoFlags
+{
+    None = 0,
+    ForceDropIfCarried = 0x1,
+    InterpretPlayerDamageAsDamageToPlayer = 0x2
+}
+
+/// The AmmoDef fields consumed by the shared Source FireBullets path. The
+/// title supplies these values; the physics bridge never invents an ammo
+/// table from an integer ammo index.
+public readonly record struct SourceAmmoDefinition(
+    int DamageType,
+    SourceAmmoFlags Flags = SourceAmmoFlags.None,
+    int PlayerDamage = 0);
+
 /// Direct representation of the Source FireBulletsInfo_t fields used by the shared fire path.
 public readonly record struct SourceFireBulletsInfo(
     int Shots,
