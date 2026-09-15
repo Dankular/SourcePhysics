@@ -1502,6 +1502,42 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void ProjectileComparatorReportsRmsAndRejectsTimingDivergence()
+    {
+        var expected = new ProjectileRecording();
+        expected.Capture(1, new(Vector3.Zero, Vector3.Zero, true, 0), null);
+        expected.Capture(2, new(new(2f, 0f, 0f), new(4f, 0f, 0f), true, 0), null);
+        var actual = new ProjectileRecording();
+        actual.Capture(1, new(Vector3.Zero, Vector3.Zero, true, 0), null);
+        actual.Capture(3, new(Vector3.Zero, Vector3.Zero, true, 0), null);
+
+        var comparison = ProjectileParityComparator.Compare(expected.Frames, actual.Frames);
+
+        Assert.Equal(1, comparison.TimingMismatchCount);
+        Assert.Equal(MathF.Sqrt(2f), comparison.PositionRms, 5);
+        Assert.Equal(2f, comparison.PositionMaximum, 5);
+        Assert.False(comparison.Passes(10f, 10f));
+    }
+
+    [Fact]
+    public void WeaponComparatorReportsRmsAndRejectsTimingDivergence()
+    {
+        var expected = new WeaponRecording();
+        expected.Capture(1, 0, 1, Vector3.Zero, Vector3.UnitZ, false, default);
+        expected.Capture(2, 1, 2, Vector3.Zero, Vector3.UnitZ, false, default);
+        var actual = new WeaponRecording();
+        actual.Capture(1, 0, 1, Vector3.Zero, Vector3.UnitZ, false, default);
+        actual.Capture(3, 1, 2, Vector3.Zero, Vector3.Normalize(new(1f, 0f, 1f)), false, default);
+
+        var comparison = WeaponParityComparator.Compare(expected.Frames, actual.Frames);
+
+        Assert.Equal(1, comparison.TimingMismatchCount);
+        Assert.True(comparison.DirectionRms > 0f);
+        Assert.True(comparison.DirectionMaximum > 0f);
+        Assert.False(comparison.Passes(10f, 10f));
+    }
+
+    [Fact]
     public void AuthoredVolumesClassifyWaterAndLadders()
     {
         var volumes = new SourceMovementVolumes();

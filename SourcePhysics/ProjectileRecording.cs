@@ -21,10 +21,12 @@ public sealed class ProjectileRecording
 public readonly record struct ProjectileParityError(int Tick, string Field);
 
 public sealed record ProjectileParityComparison(float PositionMaximum, float VelocityMaximum,
-    IReadOnlyList<ProjectileParityError> Errors)
+    IReadOnlyList<ProjectileParityError> Errors, float PositionRms = 0f, float VelocityRms = 0f,
+    int TimingMismatchCount = 0)
 {
     public bool Passes(float positionTolerance, float velocityTolerance) =>
-        PositionMaximum <= positionTolerance && VelocityMaximum <= velocityTolerance && Errors.Count == 0;
+        TimingMismatchCount == 0 && PositionMaximum <= positionTolerance &&
+        VelocityMaximum <= velocityTolerance && Errors.Count == 0;
 }
 
 public static class ProjectileParityComparator
@@ -35,15 +37,24 @@ public static class ProjectileParityComparator
         var errors = new List<ProjectileParityError>();
         var positionMaximum = 0f;
         var velocityMaximum = 0f;
+        var positionSum = 0f;
+        var velocitySum = 0f;
+        var timingMismatchCount = Math.Abs(expected.Count - actual.Count);
         if (expected.Count != actual.Count) errors.Add(new(-1, "frame-count"));
         var count = Math.Min(expected.Count, actual.Count);
         for (var index = 0; index < count; index++)
         {
             var left = expected[index];
             var right = actual[index];
-            if (left.Tick != right.Tick) errors.Add(new(left.Tick, "tick"));
+            if (left.Tick != right.Tick)
+            {
+                timingMismatchCount++;
+                errors.Add(new(left.Tick, "tick"));
+            }
             var positionError = Vector3.Distance(left.State.Position, right.State.Position);
             var velocityError = Vector3.Distance(left.State.Velocity, right.State.Velocity);
+            positionSum += positionError * positionError;
+            velocitySum += velocityError * velocityError;
             positionMaximum = MathF.Max(positionMaximum, positionError);
             velocityMaximum = MathF.Max(velocityMaximum, velocityError);
             if (positionError > positionTolerance) errors.Add(new(left.Tick, "position"));
@@ -55,7 +66,9 @@ public static class ProjectileParityComparator
                 errors.Add(new(left.Tick, "penetration-power"));
             CompareHits(left.Tick, left.Hit, right.Hit, errors);
         }
-        return new(positionMaximum, velocityMaximum, errors);
+        var divisor = Math.Max(1, count);
+        return new(positionMaximum, velocityMaximum, errors,
+            MathF.Sqrt(positionSum / divisor), MathF.Sqrt(velocitySum / divisor), timingMismatchCount);
     }
 
     private static void CompareHits(int tick, ProjectileHit? expected, ProjectileHit? actual,

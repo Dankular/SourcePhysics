@@ -55,10 +55,12 @@ public sealed class WeaponRecording
 public readonly record struct WeaponParityError(int Tick, int ShotIndex, string Field);
 
 public sealed record WeaponParityComparison(float DirectionMaximum, float FractionMaximum,
-    IReadOnlyList<WeaponParityError> Errors)
+    IReadOnlyList<WeaponParityError> Errors, float DirectionRms = 0f, float FractionRms = 0f,
+    int TimingMismatchCount = 0)
 {
     public bool Passes(float directionTolerance, float fractionTolerance) =>
-        DirectionMaximum <= directionTolerance && FractionMaximum <= fractionTolerance && Errors.Count == 0;
+        TimingMismatchCount == 0 && DirectionMaximum <= directionTolerance &&
+        FractionMaximum <= fractionTolerance && Errors.Count == 0;
 }
 
 public static class WeaponParityComparator
@@ -69,6 +71,9 @@ public static class WeaponParityComparator
         var errors = new List<WeaponParityError>();
         var directionMaximum = 0f;
         var fractionMaximum = 0f;
+        var directionSum = 0f;
+        var fractionSum = 0f;
+        var timingMismatchCount = Math.Abs(expected.Count - actual.Count);
         if (expected.Count != actual.Count)
             errors.Add(new(-1, -1, "shot-count"));
 
@@ -77,7 +82,11 @@ public static class WeaponParityComparator
         {
             var left = expected[index];
             var right = actual[index];
-            if (left.Tick != right.Tick) errors.Add(new(left.Tick, left.ShotIndex, "tick"));
+            if (left.Tick != right.Tick)
+            {
+                timingMismatchCount++;
+                errors.Add(new(left.Tick, left.ShotIndex, "tick"));
+            }
             if (left.ShotIndex != right.ShotIndex) errors.Add(new(left.Tick, left.ShotIndex, "shot-index"));
             if (left.RandomSeed != right.RandomSeed) errors.Add(new(left.Tick, left.ShotIndex, "random-seed"));
             if (left.Hit != right.Hit) errors.Add(new(left.Tick, left.ShotIndex, "hit"));
@@ -97,12 +106,14 @@ public static class WeaponParityComparator
             if (left.TracerDestination != right.TracerDestination) errors.Add(new(left.Tick, left.ShotIndex, "tracer-destination"));
 
             var directionError = Vector3.Distance(left.Direction, right.Direction);
+            directionSum += directionError * directionError;
             directionMaximum = MathF.Max(directionMaximum, directionError);
             if (directionError > directionTolerance) errors.Add(new(left.Tick, left.ShotIndex, "direction"));
 
             if (left.Hit && right.Hit)
             {
                 var fractionError = MathF.Abs(left.HitData.Fraction - right.HitData.Fraction);
+                fractionSum += fractionError * fractionError;
                 fractionMaximum = MathF.Max(fractionMaximum, fractionError);
                 if (fractionError > fractionTolerance) errors.Add(new(left.Tick, left.ShotIndex, "fraction"));
                 if (left.HitData.BodyId != right.HitData.BodyId) errors.Add(new(left.Tick, left.ShotIndex, "body"));
@@ -113,6 +124,8 @@ public static class WeaponParityComparator
                 if (left.HitData.Contents != right.HitData.Contents) errors.Add(new(left.Tick, left.ShotIndex, "contents"));
             }
         }
-        return new(directionMaximum, fractionMaximum, errors);
+        var divisor = Math.Max(1, count);
+        return new(directionMaximum, fractionMaximum, errors,
+            MathF.Sqrt(directionSum / divisor), MathF.Sqrt(fractionSum / divisor), timingMismatchCount);
     }
 }
