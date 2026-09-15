@@ -67,7 +67,7 @@ public sealed class SourceMovementMotor
         switch (input.MoveType)
         {
             case SourceMoveType.None: state = state with { Velocity = Vector3.Zero }; break;
-            case SourceMoveType.Observer: NoClip(ref state, input, dt, profile.ObserverSpeedFactor, profile.ObserverAcceleration); break;
+            case SourceMoveType.Observer: Observer(ref state, input, dt); break;
             case SourceMoveType.Noclip: NoClip(ref state, input, dt, profile.NoclipSpeedFactor, profile.NoclipAcceleration); break;
             case SourceMoveType.Fly: Fly(ref state, input, dt, false); break;
             case SourceMoveType.FlyGravity: Fly(ref state, input, dt, true); break;
@@ -397,6 +397,68 @@ public sealed class SourceMovementMotor
         }
         else velocity = Vector3.Zero;
         s = s with { Velocity = velocity, Position = s.Position + velocity * dt, Ground = GroundState.Airborne, GroundBodyId = -1 };
+    }
+
+    private void Observer(ref MovementState s, in SourceInput input, float dt)
+    {
+        // FullObserverMove has three distinct responsibilities in Source:
+        // target following, non-moving cinematic modes, and roaming. Keeping
+        // these branches explicit prevents observer state from becoming an
+        // accidental alias for noclip.
+        if (input.ObserverMode is SourceObserverMode.InEye or SourceObserverMode.Chase)
+        {
+            if (queries.TryGetObserverTarget(out var target))
+            {
+                s = s with { Position = target.Position, Velocity = target.Velocity,
+                    Ground = GroundState.Airborne, GroundBodyId = -1, Ducking = false };
+            }
+            return;
+        }
+
+        if (input.ObserverMode is not SourceObserverMode.Roaming)
+        {
+            // Source fixed/death/freeze cameras return without changing the
+            // movement command state; the presentation layer owns their view.
+            return;
+        }
+
+        if (input.ObserverNoClip)
+        {
+            NoClip(ref s, input, dt, profile.ObserverSpeedFactor, profile.ObserverAcceleration);
+            return;
+        }
+
+        // Source's clipped roaming path is FullObserverMove, not
+        // FullNoClipMove: it uses a view-space wish velocity, ordinary
+        // observer friction, and TryPlayerMove collision clipping.
+        var forward = Forward(input.ViewPitchRadians, input.ViewYawRadians);
+        var right = Right(input.ViewYawRadians);
+        var factor = profile.ObserverSpeedFactor;
+        if (input.IsDown(Buttons.Speed)) factor *= 0.5f;
+        var wishVelocity = forward * (input.Move.Y * factor) + right * (input.Move.X * factor) +
+            Vector3.UnitY * input.UpMove;
+        var wishSpeed = wishVelocity.Length();
+        var maxSpeed = profile.MaxSpeed;
+        if (wishSpeed > maxSpeed)
+        {
+            wishVelocity *= maxSpeed / wishSpeed;
+            wishSpeed = maxSpeed;
+        }
+        var wishDirection = wishSpeed > 1e-6f ? wishVelocity / wishSpeed : Vector3.Zero;
+        Accelerate(ref s, wishDirection, wishSpeed, profile.ObserverAcceleration, dt, false);
+
+        var speed = s.Velocity.Length();
+        if (speed < SourceUnits.ToMeters(1f))
+            s = s with { Velocity = Vector3.Zero };
+        else
+        {
+            var control = MathF.Max(speed, maxSpeed / 4f);
+            var drop = control * profile.GroundFriction * dt;
+            var newSpeed = MathF.Max(0f, speed - drop);
+            s = s with { Velocity = s.Velocity * (newSpeed / speed) };
+        }
+        Move(ref s, dt);
+        s = s with { Ground = GroundState.Airborne, GroundBodyId = -1 };
     }
 
     private void Friction(ref MovementState s, float dt)

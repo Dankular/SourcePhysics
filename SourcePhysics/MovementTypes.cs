@@ -7,6 +7,7 @@ public enum Buttons { None = 0, Jump = 1, Duck = 2, Forward = 4, Back = 8, Use =
 
 public enum SourceMoveType { Walk, Fly, FlyGravity, Ladder, Noclip, Observer, None }
 public enum SourceWaterLevel { Dry, Feet, Waist, Eyes }
+public enum SourceObserverMode { None, DeathCam, FreezeCam, Fixed, InEye, Chase, Roaming }
 
 [Flags]
 public enum SourceWaterCurrent
@@ -21,7 +22,8 @@ public enum SourceWaterCurrent
 }
 
 public readonly record struct SourceInput(Vector2 Move, Buttons Buttons, float ViewYawRadians = 0f,
-    float UpMove = 0f, SourceMoveType MoveType = SourceMoveType.Walk, float ViewPitchRadians = 0f)
+    float UpMove = 0f, SourceMoveType MoveType = SourceMoveType.Walk, float ViewPitchRadians = 0f,
+    SourceObserverMode ObserverMode = SourceObserverMode.Roaming, bool ObserverNoClip = true)
 {
     public bool IsDown(Buttons button) => (Buttons & button) != 0;
 }
@@ -70,5 +72,10 @@ public interface ISourceMovementQueries
     /// direction to the player's base velocity. Providers that have no
     /// current return zero.
     Vector3 GetWaterBaseVelocity(Vector3 position, SourceWaterLevel waterLevel) => Vector3.Zero;
+    bool TryGetObserverTarget(out MovementState target)
+    {
+        target = default;
+        return false;
+    }
     bool TryLadder(Vector3 position, Vector3 direction, out Vector3 normal, out int bodyId);
 }

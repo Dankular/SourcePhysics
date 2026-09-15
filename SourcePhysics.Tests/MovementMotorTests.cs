@@ -1735,6 +1735,34 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void ObserverDispatchPreservesSourceModesAndTargetFollowing()
+    {
+        var profile = new SourceMovementProfile();
+        var fixedCamera = new SourceMovementMotor(profile, new FlatGroundQueries(), Vector3.Zero);
+        fixedCamera.LoadState(new(Vector3.Zero, new(1f, 0f, 0f), GroundState.Airborne, Vector3.UnitY, -1, 1f, false, false));
+        fixedCamera.Tick(new SourceInput(new(0f, 1f), Buttons.None, MoveType: SourceMoveType.Observer,
+            ObserverMode: SourceObserverMode.Fixed), 1f / 66f);
+        Assert.Equal(Vector3.Zero, fixedCamera.State.Position);
+        Assert.Equal(new Vector3(1f, 0f, 0f), fixedCamera.State.Velocity);
+
+        var queries = new FlatGroundQueries
+        {
+            ObserverTarget = new MovementState(new(4f, 5f, 6f), new(7f, 8f, 9f),
+                GroundState.Grounded, Vector3.UnitY, 3, 1f, false, false)
+        };
+        var inEye = new SourceMovementMotor(profile, queries, Vector3.Zero);
+        inEye.Tick(new SourceInput(Vector2.Zero, Buttons.None, MoveType: SourceMoveType.Observer,
+            ObserverMode: SourceObserverMode.InEye), 1f / 66f);
+        Assert.Equal(new Vector3(4f, 5f, 6f), inEye.State.Position);
+        Assert.Equal(new Vector3(7f, 8f, 9f), inEye.State.Velocity);
+
+        var roaming = new SourceMovementMotor(profile, new FlatGroundQueries(), Vector3.Zero);
+        roaming.Tick(new SourceInput(new(0f, 1f), Buttons.None, MoveType: SourceMoveType.Observer,
+            ObserverMode: SourceObserverMode.Roaming, ObserverNoClip: true), 1f / 66f);
+        Assert.True(roaming.State.Position.LengthSquared() > 0f);
+    }
+
+    [Fact]
     public void EvidenceManifestLoadsTypedPushawayProfile()
     {
         var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "source-profile.json"));
@@ -2149,6 +2177,7 @@ public sealed class MovementMotorTests
         public int ImpulseCount { get; private set; }
         public int LastImpulseBodyId { get; private set; } = -1;
         public Vector3 LastImpulse { get; private set; }
+        public MovementState? ObserverTarget { get; set; }
         public MovementContact SweepPlayer(Vector3 start, Vector3 end, bool crouched)
         {
             if (end.Y <= 0 && start.Y >= 0) return new(new(end.X, 0, end.Z), Vector3.UnitY, 0.5f, ContactBodyId, 1, 0);
@@ -2163,6 +2192,11 @@ public sealed class MovementMotorTests
             LastImpulse = impulse;
         }
         public SourceWaterLevel GetWaterLevel(Vector3 position, bool crouched) => WaterLevel;
+        public bool TryGetObserverTarget(out MovementState target)
+        {
+            if (ObserverTarget is { } value) { target = value; return true; }
+            target = default; return false;
+        }
         public bool TryLadder(Vector3 position, Vector3 direction, out Vector3 normal, out int bodyId)
         {
             normal = LadderNormal; bodyId = LadderBodyId; return LadderActive;
