@@ -595,6 +595,28 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void TriggerLayerDoesNotTouchAnotherTrigger()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(1024, 0, 1024, 256);
+        var first = host.CreateBoxBody(new(1f), Vector3.Zero, JoltPhysicsSharp.MotionType.Static,
+            SourceObjectLayer.Trigger);
+        var second = host.CreateBoxBody(new(0.5f), Vector3.Zero, JoltPhysicsSharp.MotionType.Static,
+            SourceObjectLayer.Trigger);
+        var triggerEvents = 0;
+        host.Contacts.TriggerEntered += value =>
+        {
+            if ((value.TriggerBody == first.ID && value.OtherBody == second.ID) ||
+                (value.TriggerBody == second.ID && value.OtherBody == first.ID))
+                triggerEvents++;
+        };
+
+        host.Step();
+
+        Assert.Equal(0, triggerEvents);
+    }
+
+    [Fact]
     public void AuthoredCollisionPolicyCanDisableAConfiguredLayerPair()
     {
         var policy = new SourceCollisionPolicy();

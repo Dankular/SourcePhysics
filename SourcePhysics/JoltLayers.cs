@@ -20,7 +20,13 @@ internal sealed class SourceCollisionLayers : IDisposable
         {
             PairFilter.EnableCollision(new ObjectLayer((ushort)a), new ObjectLayer((ushort)b));
             var sensorPair = (SourceObjectLayer)a == SourceObjectLayer.Trigger || (SourceObjectLayer)b == SourceObjectLayer.Trigger;
-            if (!policy.CanCollide((SourceObjectLayer)a, (SourceObjectLayer)b) && !sensorPair)
+            var triggerPair = (SourceObjectLayer)a == SourceObjectLayer.Trigger &&
+                (SourceObjectLayer)b == SourceObjectLayer.Trigger;
+            // Source trigger volumes do not touch other trigger volumes, but
+            // sensor-vs-solid pairs remain enabled for trigger events without
+            // making the pair physically solid.
+            if (!policy.CanCollide((SourceObjectLayer)a, (SourceObjectLayer)b) &&
+                (!sensorPair || triggerPair))
                 PairFilter.DisableCollision(new ObjectLayer((ushort)a), new ObjectLayer((ushort)b));
         }
         ObjectVsBroadPhase = new ObjectVsBroadPhaseLayerFilterTable(BroadPhase, 2, PairFilter, count);
