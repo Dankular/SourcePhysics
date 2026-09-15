@@ -13,6 +13,53 @@ public static class SourceVehicleDynamics
     public const float WattsPerHorsepower = 745f;
     public const float SecondsPerMinute = 60f;
 
+    public readonly record struct SpeedGovernorResult(float Throttle, float Brake);
+
+    /// Exact CVehicleController::CalcEngine speed-governor branch from
+    /// physics_vehicle.cpp. Source has separate PC and console rules, so the
+    /// caller must provide the title's platform branch.
+    public static SpeedGovernorResult ApplySpeedGovernor(SourceVehicleProfile profile,
+        float throttle, float brake, float speedSourceUnitsPerSecond, bool torqueBoost,
+        int wheelsInContact, bool isPc)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        profile.Validate();
+        if (!float.IsFinite(throttle) || !float.IsFinite(brake) ||
+            !float.IsFinite(speedSourceUnitsPerSecond))
+            throw new ArgumentOutOfRangeException(nameof(speedSourceUnitsPerSecond));
+
+        var absoluteSpeed = MathF.Abs(SourceUnitsPerSecondToMilesPerHour(speedSourceUnitsPerSecond));
+        if (isPc)
+        {
+            var maxSpeed = MathF.Max(1f, torqueBoost
+                ? profile.Engine.BoostMaxSpeedMilesPerHour
+                : profile.Engine.MaxSpeedMilesPerHour);
+            if (throttle > 0f && absoluteSpeed > maxSpeed)
+            {
+                var fraction = absoluteSpeed / maxSpeed;
+                if (fraction > profile.Engine.AutoBrakeSpeedGain)
+                {
+                    throttle = 0f;
+                    brake = (fraction - 1f) * profile.Engine.AutoBrakeSpeedFactor;
+                    if (wheelsInContact == 0) brake = 0f;
+                }
+                throttle *= 0.1f;
+            }
+        }
+        else if (throttle > 0f &&
+                 ((!torqueBoost && absoluteSpeed > profile.Engine.MaxSpeedMilesPerHour * throttle) ||
+                  (torqueBoost && absoluteSpeed > profile.Engine.BoostMaxSpeedMilesPerHour)))
+        {
+            throttle *= 0.1f;
+        }
+
+        if (throttle < 0f && !torqueBoost &&
+            absoluteSpeed > profile.Engine.MaxReverseSpeedMilesPerHour)
+            throttle *= 0.1f;
+
+        return new(throttle, brake);
+    }
+
     /// Exact physics_vehicle.cpp wheel-contact material override. The normal is
     /// expressed in wheel space, where X is the wheel's lateral axis.
     public static float OverrideWheelContactFriction(float friction, Vector3 wheelSpaceContactNormal)

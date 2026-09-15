@@ -80,6 +80,51 @@ public sealed class SourceVehicleDynamicsTests
     }
 
     [Fact]
+    public void SpeedGovernorMatchesSourcePcAutobrakeAndReverseRules()
+    {
+        var profile = Profile() with
+        {
+            Engine = new SourceVehicleEngineProfile
+            {
+                MaxSpeedMilesPerHour = 100f, MaxReverseSpeedMilesPerHour = 50f,
+                AutoBrakeSpeedGain = 1.1f, AutoBrakeSpeedFactor = 0.5f
+            }
+        };
+        var overSpeed = SourceVehicleDynamics.ApplySpeedGovernor(profile, 1f, 0.2f,
+            SourceVehicleDynamics.MilesPerHourToSourceUnitsPerSecond(120f), false, 2, true);
+        Assert.Equal(0f, overSpeed.Throttle);
+        Assert.Equal(0.1f, overSpeed.Brake, 5);
+
+        var airborne = SourceVehicleDynamics.ApplySpeedGovernor(profile, 1f, 0.2f,
+            SourceVehicleDynamics.MilesPerHourToSourceUnitsPerSecond(120f), false, 0, true);
+        Assert.Equal(0f, airborne.Brake);
+
+        var reverse = SourceVehicleDynamics.ApplySpeedGovernor(profile, -1f, 0f,
+            SourceVehicleDynamics.MilesPerHourToSourceUnitsPerSecond(60f), false, 2, true);
+        Assert.Equal(-0.1f, reverse.Throttle, 5);
+    }
+
+    [Fact]
+    public void SpeedGovernorMatchesSourceConsoleThrottleReductionAndBoostBranch()
+    {
+        var profile = Profile() with
+        {
+            Engine = new SourceVehicleEngineProfile
+            {
+                MaxSpeedMilesPerHour = 100f, BoostMaxSpeedMilesPerHour = 140f,
+                MaxReverseSpeedMilesPerHour = 50f
+            }
+        };
+        var normal = SourceVehicleDynamics.ApplySpeedGovernor(profile, 1f, 0f,
+            SourceVehicleDynamics.MilesPerHourToSourceUnitsPerSecond(110f), false, 2, false);
+        Assert.Equal(0.1f, normal.Throttle, 5);
+
+        var boost = SourceVehicleDynamics.ApplySpeedGovernor(profile, 1f, 0f,
+            SourceVehicleDynamics.MilesPerHourToSourceUnitsPerSecond(110f), true, 2, false);
+        Assert.Equal(1f, boost.Throttle);
+    }
+
+    [Fact]
     public void WheelContactOutsideTheSourceFifteenDegreeConeHasZeroFriction()
     {
         Assert.Equal(0f, SourceVehicleDynamics.OverrideWheelContactFriction(0.8f,
