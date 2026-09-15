@@ -1146,6 +1146,20 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void AllSolidMovementStopsWithoutApplyingARecoveryLift()
+    {
+        var queries = new FlatGroundQueries { AllSolid = true };
+        var motor = new SourceMovementMotor(new SourceMovementProfile(), queries, new Vector3(0f, 2f, 0f));
+        motor.LoadState(new(new Vector3(0f, 2f, 0f), Vector3.UnitX,
+            GroundState.Airborne, Vector3.UnitY, -1, 1f, false, false));
+        motor.Tick(new SourceInput(new(0f, 1f), Buttons.None), 1f / 66f);
+        Assert.Equal(new Vector3(0f, 2f, 0f), motor.State.Position);
+        Assert.Equal(0f, motor.State.Velocity.X);
+        Assert.Equal(0f, motor.State.Velocity.Z);
+        Assert.Equal(GroundState.Stuck, motor.State.Ground);
+    }
+
+    [Fact]
     public void MovementSnapshotRestoresJumpEdgeHistoryForPrediction()
     {
         var motor = new SourceMovementMotor(new SourceMovementProfile(), new FlatGroundQueries(), Vector3.Zero);
@@ -2219,6 +2233,8 @@ public sealed class MovementMotorTests
         public int LadderBodyId { get; set; } = -1;
         public SourceWaterLevel WaterLevel { get; set; } = SourceWaterLevel.Dry;
         public bool Empty { get; set; } = true;
+        public bool StartSolid { get; set; }
+        public bool AllSolid { get; set; }
         public bool WaterJumpActive { get; set; }
         public Vector3 WaterJumpVelocity { get; set; }
         public float WaterJumpDuration { get; set; }
@@ -2229,6 +2245,8 @@ public sealed class MovementMotorTests
         public MovementState? ObserverTarget { get; set; }
         public MovementContact SweepPlayer(Vector3 start, Vector3 end, bool crouched)
         {
+            if (StartSolid || AllSolid)
+                return new(start, -Vector3.UnitX, 0f, ContactBodyId, 1f, 0f, StartSolid, AllSolid);
             if (end.Y <= 0 && start.Y >= 0) return new(new(end.X, 0, end.Z), Vector3.UnitY, 0.5f, ContactBodyId, 1, 0);
             return new(end, Vector3.UnitY, 1f, -1, 1, 0);
         }

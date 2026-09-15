@@ -497,33 +497,13 @@ public sealed class SourceMovementMotor
         for (var bump = 0; bump < profile.MaxBumps && timeLeft > 0; bump++)
         {
             if (s.Velocity.LengthSquared() < 1e-12f) break; var hit = queries.SweepPlayer(s.Position, s.Position + s.Velocity * timeLeft, s.Ducking);
-            if (hit.StartSolid || hit.AllSolid)
+            if (hit.AllSolid)
             {
-                // A player standing exactly on a triangle can be reported as
-                // start-solid during a horizontal cast because of the convex
-                // radius. Lift the sweep by a tiny epsilon and retry before
-                // declaring the player stuck.
-                if (MathF.Abs(s.Velocity.Y) < 0.01f)
-                {
-                    var lift = SourceUnits.ToMeters(2f);
-                    var liftedStart = s.Position + Vector3.UnitY * lift;
-                    var liftedEnd = liftedStart + s.Velocity * timeLeft;
-                    var liftedHit = queries.SweepPlayer(liftedStart, liftedEnd, s.Ducking);
-                    if (!liftedHit.StartSolid && !liftedHit.AllSolid)
-                    {
-                        s = s with { Position = liftedStart };
-                        hit = liftedHit;
-                    }
-                    else if (hit.Normal.Y >= profile.StandableNormalZ)
-                    {
-                        // Preserve ground-parallel movement when the supporting
-                        // floor is reported as an initial overlap.
-                        s = s with { Position = s.Position + s.Velocity * timeLeft };
-                        break;
-                    }
-                    else { s = s with { Velocity = Vector3.Zero, Ground = GroundState.Stuck }; return; }
-                }
-                else { s = s with { Velocity = Vector3.Zero, Ground = GroundState.Stuck }; return; }
+                // Source TryPlayerMove only gives the trapped/all-solid path
+                // special treatment. A start-solid trace still participates in
+                // the normal plane clipping and reversal rules below.
+                s = s with { Velocity = Vector3.Zero, Ground = GroundState.Stuck };
+                return;
             }
             allFraction += hit.Fraction;
             if (hit.Fraction > 0f)
