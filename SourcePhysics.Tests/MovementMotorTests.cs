@@ -399,18 +399,27 @@ public sealed class MovementMotorTests
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
         host.Initialize(1024, 0, 1024, 256);
         var body = host.CreateBoxBody(Vector3.One, new(2f, 3f, 4f), JoltPhysicsSharp.MotionType.Dynamic,
-            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { GravityFactor = 0f });
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                GravityFactor = 0f,
+                CollisionGroup = SourceCollisionGroup.PushAway,
+                SolidFlags = SourceSolidFlags.NotSolid
+            });
         host.Bodies.SetLinearVelocity(body, new(1f, 2f, 3f));
         var captured = host.CaptureState(17);
         var restored = SourcePhysicsWorldState.FromJson(captured.ToJson());
 
         host.Bodies.SetRPositionAndRotation(body, new(20f, 20f, 20f), Quaternion.Identity, JoltPhysicsSharp.Activation.Activate);
         host.Bodies.SetLinearVelocity(body, Vector3.Zero);
+        host.SetBodyCollisionGroup(body, SourceCollisionGroup.None);
+        host.SetBodySolidFlags(body, SourceSolidFlags.None);
         host.RestoreState(restored);
 
         var current = host.CaptureState(17).Bodies.Single(snapshot => snapshot.BodyId == body.ID);
         var expected = restored.Bodies.Single(snapshot => snapshot.BodyId == body.ID);
         Assert.True(SourcePhysicsStateMath.NearlyEqual(expected, current, 0.000001f, 0.000001f, 0.000001f));
+        Assert.Equal(SourceCollisionGroup.PushAway, current.State.CollisionGroup);
+        Assert.Equal(SourceSolidFlags.NotSolid, current.State.SolidFlags);
     }
 
     [Fact]

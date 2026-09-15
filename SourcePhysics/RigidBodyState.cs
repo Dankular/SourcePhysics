@@ -14,7 +14,9 @@ public readonly record struct SourceRigidBodyState(
     float Friction = 0.8f,
     float Restitution = 0.001f,
     SourceContents ContentsMask = SourceContents.Solid,
-    ulong UserData = 0);
+    ulong UserData = 0,
+    SourceCollisionGroup CollisionGroup = SourceCollisionGroup.None,
+    SourceSolidFlags SolidFlags = SourceSolidFlags.None);
 
 public static class JoltRigidBodyState
 {
@@ -32,7 +34,7 @@ public static class JoltRigidBodyState
             host.Bodies.GetAngularVelocity(bodyId), host.Bodies.IsActive(bodyId),
             host.Bodies.GetMotionType(bodyId), host.Bodies.GetGravityFactor(bodyId),
             host.Bodies.GetFriction(bodyId), host.Bodies.GetRestitution(bodyId), host.GetBodyContents(bodyId),
-            host.Bodies.GetUserData(bodyId));
+            host.Bodies.GetUserData(bodyId), host.GetBodyCollisionGroup(bodyId), host.GetBodySolidFlags(bodyId));
     }
 
     public static void Restore(JoltPhysicsHost host, BodyID bodyId, in SourceRigidBodyState state)
@@ -49,6 +51,8 @@ public static class JoltRigidBodyState
         host.Bodies.SetFriction(bodyId, state.Friction);
         host.Bodies.SetRestitution(bodyId, state.Restitution);
         host.Bodies.SetUserData(bodyId, state.UserData);
+        host.SetBodyCollisionGroup(bodyId, state.CollisionGroup);
+        host.SetBodySolidFlags(bodyId, state.SolidFlags);
 
         host.Bodies.SetRPositionAndRotation(in bodyId, in position, in rotation,
             state.Active ? Activation.Activate : Activation.DontActivate);

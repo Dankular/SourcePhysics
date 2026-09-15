@@ -33,6 +33,8 @@ public static class SourcePhysicsStateMath
             expected.State.Friction == actual.State.Friction &&
             expected.State.Restitution == actual.State.Restitution &&
             expected.State.ContentsMask == actual.State.ContentsMask &&
+            expected.State.CollisionGroup == actual.State.CollisionGroup &&
+            expected.State.SolidFlags == actual.State.SolidFlags &&
             expected.State.UserData == actual.State.UserData;
     }
 }
@@ -108,6 +110,8 @@ public static class PhysicsWorldComparator
             if (expectedState.Friction != actualState.Friction) errors.Add($"friction:{expectedBody.Key}");
             if (expectedState.Restitution != actualState.Restitution) errors.Add($"restitution:{expectedBody.Key}");
             if (expectedState.ContentsMask != actualState.ContentsMask) errors.Add($"contents:{expectedBody.Key}");
+            if (expectedState.CollisionGroup != actualState.CollisionGroup) errors.Add($"collision-group:{expectedBody.Key}");
+            if (expectedState.SolidFlags != actualState.SolidFlags) errors.Add($"solid-flags:{expectedBody.Key}");
             if (expectedState.UserData != actualState.UserData) errors.Add($"user-data:{expectedBody.Key}");
             if (expectedState.Position != actualState.Position) errors.Add($"position:{expectedBody.Key}");
             if (expectedState.Rotation != actualState.Rotation) errors.Add($"rotation:{expectedBody.Key}");
