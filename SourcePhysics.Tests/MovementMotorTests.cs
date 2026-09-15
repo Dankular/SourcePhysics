@@ -1011,6 +1011,18 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void FlyClampsVelocityBeforeTheSingleTossSweep()
+    {
+        var profile = new SourceMovementProfile { MaxVelocitySourceUnitsPerSecond = 100f };
+        var motor = new SourceMovementMotor(profile, new FlatGroundQueries(), new Vector3(0f, 1f, 0f));
+        motor.LoadState(new(new Vector3(0f, 1f, 0f), new Vector3(10f, 0f, 0f), GroundState.Airborne,
+            Vector3.UnitY, -1, 1f, false, false, MoveType: SourceMoveType.Fly));
+        motor.Tick(new SourceInput(Vector2.Zero, Buttons.None, MoveType: SourceMoveType.Fly), 1f);
+        Assert.Equal(profile.MaxVelocity, motor.State.Velocity.X, 5);
+        Assert.Equal(profile.MaxVelocity, motor.State.Position.X, 5);
+    }
+
+    [Fact]
     public void BackwardWishSpeedUsesProfileScale()
     {
         var profile = new SourceMovementProfile { BackwardSpeedScale = 0.5f };
