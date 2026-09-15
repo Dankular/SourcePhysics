@@ -20,6 +20,11 @@ public sealed class JoltStaticMeshBody : SyncScript
 
     public BodyID BodyId { get; private set; }
 
+    public void SetCollisionGroup(SourceCollisionGroup group) => PhysicsSystem.Host.SetBodyCollisionGroup(BodyId, group);
+    public SourceCollisionGroup GetCollisionGroup() => PhysicsSystem.Host.GetBodyCollisionGroup(BodyId);
+    public void SetSolidFlags(SourceSolidFlags flags) => PhysicsSystem.Host.SetBodySolidFlags(BodyId, flags);
+    public SourceSolidFlags GetSolidFlags() => PhysicsSystem.Host.GetBodySolidFlags(BodyId);
+
     public override void Start()
     {
         if (PhysicsSystem is null) throw new InvalidOperationException("Assign PhysicsSystem before starting JoltStaticMeshBody.");
