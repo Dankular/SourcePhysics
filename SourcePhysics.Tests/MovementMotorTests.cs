@@ -1779,6 +1779,19 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void MovementRecordingPreservesObserverInputState()
+    {
+        var recording = new MovementRecording();
+        var state = new MovementState(Vector3.Zero, Vector3.Zero, GroundState.Airborne,
+            Vector3.UnitY, -1, 1f, false, false, MoveType: SourceMoveType.Observer);
+        recording.Capture(0, state, new SourceInput(Vector2.Zero, Buttons.None,
+            MoveType: SourceMoveType.Observer, ObserverMode: SourceObserverMode.InEye, ObserverNoClip: false));
+        var restored = MovementRecording.FromJson(recording.ToJson());
+        Assert.Equal(SourceObserverMode.InEye, restored.Frames[0].ObserverMode);
+        Assert.False(restored.Frames[0].ObserverNoClip);
+    }
+
+    [Fact]
     public void EvidenceManifestLoadsTypedPushawayProfile()
     {
         var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "source-profile.json"));

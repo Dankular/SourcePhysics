@@ -19,6 +19,8 @@ public readonly record struct MovementFrame(
     float UpMove = 0f,
     float ViewYawRadians = 0f,
     float ViewPitchRadians = 0f,
+    SourceObserverMode ObserverMode = SourceObserverMode.Roaming,
+    bool ObserverNoClip = true,
     Quaternion Orientation = default,
     Vector3 AngularVelocity = default,
     MovementContact[]? Contacts = null,
@@ -71,7 +73,7 @@ public sealed class MovementRecording
         if (orientation == default) orientation = Quaternion.Identity;
         Frames.Add(new(tick, state.Position, state.Velocity, state.Ground, state.GroundNormal, state.GroundBodyId,
             state.Ducking, state.Jumped, state.WaterLevel, state.MoveType, input.Buttons, input.Move, input.UpMove,
-            input.ViewYawRadians, input.ViewPitchRadians, orientation,
+            input.ViewYawRadians, input.ViewPitchRadians, input.ObserverMode, input.ObserverNoClip, orientation,
             angularVelocity, contacts?.ToArray(), impulses?.ToArray(), state.ViewHeightSourceUnits,
             state.SurfaceFriction, state.SurfaceMaxSpeedFactor, state.SurfaceJumpFactor,
             state.WaterJumpTime, state.BaseVelocity, state.FallVelocity, state.PreviousJumpDown,
@@ -153,6 +155,8 @@ public static class ParityComparator
             if (expected[i].ViewYawRadians != actual[i].ViewYawRadians ||
                 expected[i].ViewPitchRadians != actual[i].ViewPitchRadians)
                 errors.Add(new(expected[i].Tick, position, velocity, "view-angle-input"));
+            if (expected[i].ObserverMode != actual[i].ObserverMode || expected[i].ObserverNoClip != actual[i].ObserverNoClip)
+                errors.Add(new(expected[i].Tick, position, velocity, "observer-input"));
             if (expected[i].Ducking != actual[i].Ducking) errors.Add(new(expected[i].Tick, position, velocity, "ducking"));
             if (expected[i].Jumped != actual[i].Jumped) errors.Add(new(expected[i].Tick, position, velocity, "jumped"));
             if (expected[i].MoveType != actual[i].MoveType) errors.Add(new(expected[i].Tick, position, velocity, "move-type"));
