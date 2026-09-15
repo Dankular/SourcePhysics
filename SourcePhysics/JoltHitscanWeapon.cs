@@ -164,11 +164,17 @@ public sealed class JoltHitscanWeapon : SyncScript
                 continue;
             }
             var startedInWater = IsWaterPoint?.Invoke(info.OriginMeters) ?? false;
-            var waterHit = waterQueries?.Cast(info.OriginMeters, shotDirection, info.DistanceMeters, out var waterImpact) == true &&
+            var waterImpact = default(HitscanHit);
+            var waterHit = waterQueries?.Cast(info.OriginMeters, shotDirection, info.DistanceMeters, out waterImpact) == true &&
                 (startedInWater || waterImpact.Fraction <= result.HitData.Fraction);
             var suppressDamage = waterHit && info.Flags.HasFlag(SourceFireBulletsFlags.DontHitUnderwater);
             var suppressImpact = waterHit && !startedInWater &&
                 !info.Flags.HasFlag(SourceFireBulletsFlags.AllowWaterSurfaceImpacts);
+            // HandleShotImpactingWater replaces the tracer endpoint with the
+            // first water-entry trace when the shot began outside water.
+            var tracerDestination = !startedInWater && waterHit
+                ? waterImpact.Position
+                : result.HitData.Position;
             var metadata = HitMetadataResolver?.Invoke(result.HitData) ?? new SourceHitMetadata(
                 result.HitData.HitGroup, result.HitData.Hitbox, result.HitData.PhysicsBone,
                 result.HitData.Contents);
@@ -192,7 +198,8 @@ public sealed class JoltHitscanWeapon : SyncScript
             var impact = new SourceFireBulletsImpact(shot, result.HitData, metadata, damage, info.AmmoType,
                 actualDamageType, info.Flags, info.DamageForceScale, isPlayer,
                 info.TracerFrequency != 0 && tracerIndex % info.TracerFrequency == 0,
-                info.PrimaryAttack, waterHit, suppressImpact, suppressDamage, damageForce);
+                info.PrimaryAttack, waterHit, suppressImpact, suppressDamage, damageForce,
+                tracerDestination);
             if (!suppressDamage && DamageTargetResolver?.Invoke(result.HitData) is { } target)
             {
                 var hitData = result.HitData;

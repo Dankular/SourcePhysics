@@ -22,7 +22,8 @@ public readonly record struct WeaponShotFrame(
     bool HitWater = false,
     bool SuppressSurfaceImpact = false,
     bool DamageSuppressed = false,
-    Vector3 DamageForce = default);
+    Vector3 DamageForce = default,
+    Vector3 TracerDestination = default);
 
 public sealed class WeaponRecording
 {
@@ -41,7 +42,8 @@ public sealed class WeaponRecording
             impact?.DamageType ?? info.DamageType, info.Flags,
             info.DamageForceScale, info.PrimaryAttack, info.TracerFrequency,
             impact?.HitWater ?? false, impact?.SuppressSurfaceImpact ?? false,
-            impact?.DamageSuppressed ?? false, impact?.DamageForce ?? default));
+            impact?.DamageSuppressed ?? false, impact?.DamageForce ?? default,
+            impact?.TracerDestination ?? (hit ? hitData.Position : origin + direction * info.DistanceMeters)));
     }
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
@@ -92,6 +94,7 @@ public static class WeaponParityComparator
             if (left.SuppressSurfaceImpact != right.SuppressSurfaceImpact) errors.Add(new(left.Tick, left.ShotIndex, "surface-impact"));
             if (left.DamageSuppressed != right.DamageSuppressed) errors.Add(new(left.Tick, left.ShotIndex, "damage-suppressed"));
             if (left.DamageForce != right.DamageForce) errors.Add(new(left.Tick, left.ShotIndex, "damage-force"));
+            if (left.TracerDestination != right.TracerDestination) errors.Add(new(left.Tick, left.ShotIndex, "tracer-destination"));
 
             var directionError = Vector3.Distance(left.Direction, right.Direction);
             directionMaximum = MathF.Max(directionMaximum, directionError);

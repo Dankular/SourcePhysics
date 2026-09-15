@@ -882,6 +882,7 @@ public sealed class MovementMotorTests
         Assert.True(impacts[0].HitWater);
         Assert.True(impacts[0].DamageSuppressed);
         Assert.True(impacts[0].SuppressSurfaceImpact);
+        Assert.InRange(impacts[0].TracerDestination.Z, 1.9f, 2.1f);
 
         impacts.Clear();
         var allowed = suppressed with { Flags = SourceFireBulletsFlags.AllowWaterSurfaceImpacts };
@@ -889,6 +890,7 @@ public sealed class MovementMotorTests
         Assert.Equal(10f, Assert.Single(impacts).Damage);
         Assert.True(impacts[0].HitWater);
         Assert.False(impacts[0].SuppressSurfaceImpact);
+        Assert.InRange(impacts[0].TracerDestination.Z, 1.9f, 2.1f);
     }
 
     [Fact]

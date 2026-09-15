@@ -78,7 +78,8 @@ public readonly record struct SourceFireBulletsImpact(
     bool HitWater = false,
     bool SuppressSurfaceImpact = false,
     bool DamageSuppressed = false,
-    Vector3 DamageForce = default);
+    Vector3 DamageForce = default,
+    Vector3 TracerDestination = default);
 
 public readonly record struct SourceGlassPenetrationResult(
     bool PassedThrough,
