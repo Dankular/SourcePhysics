@@ -45,7 +45,8 @@ public sealed record PhysicsWorldComparison(
     float RotationMaximum,
     float LinearVelocityMaximum,
     float AngularVelocityMaximum,
-    IReadOnlyList<string> Errors)
+    IReadOnlyList<string> Errors, float PositionRms = 0f, float RotationRms = 0f,
+    float LinearVelocityRms = 0f, float AngularVelocityRms = 0f, int ComparedBodyCount = 0)
 {
     public bool Passes(float positionTolerance, float rotationTolerance, float velocityTolerance,
         float angularVelocityTolerance) => !TickMismatch && MissingBodies == 0 && ExtraBodies == 0 &&
@@ -72,6 +73,11 @@ public static class PhysicsWorldComparator
         var rotationMaximum = 0f;
         var linearMaximum = 0f;
         var angularMaximum = 0f;
+        var positionSum = 0f;
+        var rotationSum = 0f;
+        var linearSum = 0f;
+        var angularSum = 0f;
+        var comparedBodyCount = 0;
 
         foreach (var expectedBody in expectedById)
         {
@@ -83,11 +89,19 @@ public static class PhysicsWorldComparator
             }
             var expectedState = expectedBody.Value.State;
             var actualState = actualBody.State;
-            positionMaximum = MathF.Max(positionMaximum, Vector3.Distance(expectedState.Position, actualState.Position));
-            rotationMaximum = MathF.Max(rotationMaximum,
-                1f - MathF.Min(1f, MathF.Abs(Quaternion.Dot(expectedState.Rotation, actualState.Rotation))));
-            linearMaximum = MathF.Max(linearMaximum, Vector3.Distance(expectedState.LinearVelocity, actualState.LinearVelocity));
-            angularMaximum = MathF.Max(angularMaximum, Vector3.Distance(expectedState.AngularVelocity, actualState.AngularVelocity));
+            var positionError = Vector3.Distance(expectedState.Position, actualState.Position);
+            var rotationError = 1f - MathF.Min(1f, MathF.Abs(Quaternion.Dot(expectedState.Rotation, actualState.Rotation)));
+            var linearError = Vector3.Distance(expectedState.LinearVelocity, actualState.LinearVelocity);
+            var angularError = Vector3.Distance(expectedState.AngularVelocity, actualState.AngularVelocity);
+            positionSum += positionError * positionError;
+            rotationSum += rotationError * rotationError;
+            linearSum += linearError * linearError;
+            angularSum += angularError * angularError;
+            comparedBodyCount++;
+            positionMaximum = MathF.Max(positionMaximum, positionError);
+            rotationMaximum = MathF.Max(rotationMaximum, rotationError);
+            linearMaximum = MathF.Max(linearMaximum, linearError);
+            angularMaximum = MathF.Max(angularMaximum, angularError);
             if (expectedState.Active != actualState.Active) errors.Add($"active:{expectedBody.Key}");
             if (expectedState.JoltMotionType != actualState.JoltMotionType) errors.Add($"motion-type:{expectedBody.Key}");
             if (expectedState.GravityFactor != actualState.GravityFactor) errors.Add($"gravity-factor:{expectedBody.Key}");
@@ -108,7 +122,10 @@ public static class PhysicsWorldComparator
                 errors.Add($"extra-body:{actualBody}");
             }
         }
+        var divisor = Math.Max(1, comparedBodyCount);
         return new PhysicsWorldComparison(expected.Tick != actual.Tick, missing, extra, positionMaximum, rotationMaximum,
-            linearMaximum, angularMaximum, errors);
+            linearMaximum, angularMaximum, errors, MathF.Sqrt(positionSum / divisor),
+            MathF.Sqrt(rotationSum / divisor), MathF.Sqrt(linearSum / divisor),
+            MathF.Sqrt(angularSum / divisor), comparedBodyCount);
     }
 }

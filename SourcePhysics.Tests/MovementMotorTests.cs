@@ -356,6 +356,9 @@ public sealed class MovementMotorTests
 
         var comparison = PhysicsWorldComparator.Compare(expected, actual);
 
+        Assert.Equal(0.0001f, comparison.PositionRms, 6);
+        Assert.Equal(0.0001f, comparison.LinearVelocityRms, 6);
+        Assert.Equal(1, comparison.ComparedBodyCount);
         Assert.True(comparison.Passes(0.001f, 0.001f, 0.001f, 0.001f));
         Assert.False(comparison.Passes(0.00001f, 0.001f, 0.001f, 0.001f));
     }
@@ -431,6 +434,7 @@ public sealed class MovementMotorTests
             }
         };
         var comparison = SourcePhysicsRecordingComparator.Compare(artifact, altered);
+        Assert.True(comparison.PositionRms > 0f);
         Assert.False(comparison.Passes(0.001f, 0.001f, 0.001f, 0.001f));
         Assert.Contains(comparison.Errors, error => error.Contains("position:"));
 

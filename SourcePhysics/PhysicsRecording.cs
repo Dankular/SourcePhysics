@@ -108,7 +108,8 @@ public sealed record SourcePhysicsRecordingComparison(
     float RotationMaximum,
     float LinearVelocityMaximum,
     float AngularVelocityMaximum,
-    IReadOnlyList<string> Errors)
+    IReadOnlyList<string> Errors, float PositionRms = 0f, float RotationRms = 0f,
+    float LinearVelocityRms = 0f, float AngularVelocityRms = 0f)
 {
     public bool Passes(float positionTolerance, float rotationTolerance,
         float velocityTolerance, float angularVelocityTolerance) =>
@@ -130,6 +131,11 @@ public static class SourcePhysicsRecordingComparator
         var rotationMaximum = 0f;
         var linearMaximum = 0f;
         var angularMaximum = 0f;
+        var positionSum = 0f;
+        var rotationSum = 0f;
+        var linearSum = 0f;
+        var angularSum = 0f;
+        var comparedBodyCount = 0;
         var count = Math.Min(expected.Frames.Count, actual.Frames.Count);
         for (var index = 0; index < count; index++)
         {
@@ -144,11 +150,19 @@ public static class SourcePhysicsRecordingComparator
             rotationMaximum = MathF.Max(rotationMaximum, world.RotationMaximum);
             linearMaximum = MathF.Max(linearMaximum, world.LinearVelocityMaximum);
             angularMaximum = MathF.Max(angularMaximum, world.AngularVelocityMaximum);
+            positionSum += world.PositionRms * world.PositionRms * world.ComparedBodyCount;
+            rotationSum += world.RotationRms * world.RotationRms * world.ComparedBodyCount;
+            linearSum += world.LinearVelocityRms * world.LinearVelocityRms * world.ComparedBodyCount;
+            angularSum += world.AngularVelocityRms * world.AngularVelocityRms * world.ComparedBodyCount;
+            comparedBodyCount += world.ComparedBodyCount;
             errors.AddRange(world.Errors.Select(error => $"frame:{left.Tick}:{error}"));
             if (!left.Contacts.SequenceEqual(right.Contacts)) errors.Add($"contacts:{left.Tick}");
             if (!left.Impulses.SequenceEqual(right.Impulses)) errors.Add($"impulses:{left.Tick}");
         }
-        return new(timing, positionMaximum, rotationMaximum, linearMaximum, angularMaximum, errors);
+        var divisor = Math.Max(1, comparedBodyCount);
+        return new(timing, positionMaximum, rotationMaximum, linearMaximum, angularMaximum, errors,
+            MathF.Sqrt(positionSum / divisor), MathF.Sqrt(rotationSum / divisor),
+            MathF.Sqrt(linearSum / divisor), MathF.Sqrt(angularSum / divisor));
     }
 }
 
