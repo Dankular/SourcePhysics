@@ -2233,6 +2233,29 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceFluidSurfacePlaneFollowsFluidObjectTransform()
+    {
+        var rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI * 0.5f);
+        var origin = new Vector3(3f, 2f, -1f);
+        var current = new Vector3(4f, 0f, 2f);
+        var local = SourceFluidSurfaceMath.CaptureLocal(new Vector4(0f, 1f, 0f, 5f),
+            current, origin, rotation);
+
+        Assert.Equal(Vector3.UnitY.X, local.Normal.X, 5);
+        Assert.Equal(Vector3.UnitY.Y, local.Normal.Y, 5);
+        Assert.Equal(Vector3.UnitY.Z, local.Normal.Z, 5);
+        Assert.Equal(3f, local.Distance, 5);
+        var world = SourceFluidSurfaceMath.ToWorld(local, origin, rotation);
+        Assert.Equal(Vector3.UnitY.X, world.Normal.X, 5);
+        Assert.Equal(Vector3.UnitY.Y, world.Normal.Y, 5);
+        Assert.Equal(Vector3.UnitY.Z, world.Normal.Z, 5);
+        Assert.Equal(5f, world.Distance, 5);
+        Assert.Equal(current.X, world.CurrentVelocity.X, 5);
+        Assert.Equal(current.Y, world.CurrentVelocity.Y, 5);
+        Assert.Equal(current.Z, world.CurrentVelocity.Z, 5);
+    }
+
+    [Fact]
     public void JoltFluidControllerTracksSensorFluidStartAndEndTouch()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
