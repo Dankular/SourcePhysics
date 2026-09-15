@@ -45,6 +45,10 @@ public sealed class SourceProjectileMotor
     /// Title-owned body classification used only by the Source custom
     /// Counter-Strike grenade collision law.
     public Func<int, bool>? IsPlayerBody { get; set; }
+    /// Returns true when the title's breakable impact dispatch destroyed the
+    /// contacted breakable. A destroyed breakable uses Source's 0.4 velocity
+    /// continuation instead of grenade bounce resolution.
+    public Func<ProjectileHit, bool>? BreakableImpactDestroyed { get; set; }
 
     public SourceProjectileMotor(SourceProjectileProfile profile, IProjectileQueries queries, Vector3 position, Vector3 velocity)
     {
@@ -90,6 +94,11 @@ public sealed class SourceProjectileMotor
 
     private void ResolveCounterStrikeGrenadeCollision(in ProjectileHit hit, Vector3 velocity, float dt)
     {
+        if (BreakableImpactDestroyed?.Invoke(hit) == true)
+        {
+            State = State with { Position = hit.Position, Velocity = velocity * 0.4f };
+            return;
+        }
         // CBaseCSGrenadeProjectile::ResolveFlyCollisionCustom treats the
         // surface as perfectly elastic, except for player contacts, then
         // clamps the projectile elasticity to [0, .9].

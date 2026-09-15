@@ -1596,6 +1596,31 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void CounterStrikeGrenadeDestroyedBreakableUsesSourceFortyPercentContinuation()
+    {
+        var projectile = new SourceProjectileMotor(new SourceProjectileProfile
+        {
+            GravityScale = 0f,
+            Restitution = 1f,
+            MaximumBounces = 2,
+            CollisionMode = SourceProjectileCollisionMode.CounterStrikeGrenade
+        }, new PlaneProjectileQueries(), new(0, 1, 0), new(0, -10, 0));
+
+        var dispatched = false;
+        projectile.BreakableImpactDestroyed = hit =>
+        {
+            dispatched = hit.BodyId == 1;
+            return dispatched;
+        };
+        projectile.Tick(0.1f);
+
+        Assert.True(dispatched);
+        Assert.Equal(-4f, projectile.State.Velocity.Y, 4);
+        Assert.True(projectile.State.Active);
+        Assert.Equal(0, projectile.State.Bounces);
+    }
+
+    [Fact]
     public void ProjectileUsesConfiguredGravityRatherThanHiddenConstant()
     {
         var queries = new NoHitProjectileQueries();
