@@ -18,6 +18,14 @@ public sealed class JoltRigidBody : SyncScript
 
     public BodyID BodyId { get; private set; }
 
+    /// Converts Jolt's center-of-mass pose back to the authored Stride entity
+    /// origin. OffsetCenterOfMassShape stores the authored offset in body
+    /// space, so writing COM position directly would shift the entity.
+    public static NumericsVector3 EntityOriginFromCenterOfMass(
+        NumericsVector3 centerOfMassPosition, NumericsQuaternion bodyRotation,
+        NumericsVector3 centerOfMassOffset) =>
+        centerOfMassPosition - NumericsVector3.Transform(centerOfMassOffset, bodyRotation);
+
     public void AddForce(NumericsVector3 force) => PhysicsSystem.Host.AddForce(BodyId, force);
     public void AddTorque(NumericsVector3 torque) => PhysicsSystem.Host.AddTorque(BodyId, torque);
     public void AddImpulse(NumericsVector3 impulse) => PhysicsSystem.Host.AddImpulse(BodyId, impulse);
@@ -62,12 +70,13 @@ public sealed class JoltRigidBody : SyncScript
         if (!BodyId.IsValid) return;
         var transform = PhysicsSystem.Host.Bodies.GetRCenterOfMassTransform(BodyId);
         var position = (NumericsVector3)transform.Translation;
-        Entity.Transform.Position = new Stride.Core.Mathematics.Vector3(position.X, position.Y, position.Z);
         var rotation = NumericsQuaternion.CreateFromRotationMatrix(new NumericsMatrix4x4(
             transform.M11, transform.M12, transform.M13, 0,
             transform.M21, transform.M22, transform.M23, 0,
             transform.M31, transform.M32, transform.M33, 0,
             0, 0, 0, 1));
+        var entityPosition = EntityOriginFromCenterOfMass(position, rotation, Profile.CenterOfMassOffsetMeters);
+        Entity.Transform.Position = new Stride.Core.Mathematics.Vector3(entityPosition.X, entityPosition.Y, entityPosition.Z);
         Entity.Transform.Rotation = new Stride.Core.Mathematics.Quaternion(rotation.X, rotation.Y, rotation.Z, rotation.W);
     }
 

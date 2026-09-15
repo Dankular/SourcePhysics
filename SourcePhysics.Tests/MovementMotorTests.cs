@@ -209,6 +209,19 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void StrideRigidBodySyncRecoversEntityOriginFromOffsetCenterOfMass()
+    {
+        var rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI * 0.5f);
+        var offset = new Vector3(0.25f, 0f, 0f);
+        var centerOfMass = new Vector3(3f, 2f, 1f);
+        var origin = JoltRigidBody.EntityOriginFromCenterOfMass(centerOfMass, rotation, offset);
+
+        Assert.Equal(3f, origin.X, 5);
+        Assert.Equal(2f, origin.Y, 5);
+        Assert.Equal(1.25f, origin.Z, 5);
+    }
+
+    [Fact]
     public void KinematicBodyUsesFixedStepMoveKinematicBridge()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
