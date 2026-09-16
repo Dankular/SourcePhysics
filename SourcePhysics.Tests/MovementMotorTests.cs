@@ -2407,6 +2407,17 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void EvidenceManifestLoadsTypedJoltSolverProfile()
+    {
+        var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "source-profile.json"));
+        var profile = SourceProfileLoader.LoadSolver(json);
+
+        Assert.Equal(0.02f, profile.SpeculativeContactDistanceMeters);
+        Assert.Equal(0.02f, profile.PenetrationSlopMeters);
+        profile.Validate();
+    }
+
+    [Fact]
     public void MovementProfileRejectsNonFiniteOrInvalidAuthoredValues()
     {
         var invalid = new SourceMovementProfile { MaxSpeedSourceUnitsPerSecond = float.NaN };

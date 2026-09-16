@@ -57,6 +57,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         FixedStepSeconds = fixedStepSeconds;
         MovementProfile = profile;
         SolverProfile = solverProfile ?? new JoltSolverProfile();
+        SolverProfile.Validate();
         CollisionPolicy = collisionPolicy ?? new SourceCollisionPolicy();
         ContactMaterialPolicy = contactMaterialPolicy ?? new SourceContactMaterialPolicy();
         Contacts = new SourceContactRouter(

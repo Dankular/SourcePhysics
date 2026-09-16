@@ -79,6 +79,20 @@ public static class SourceProfileLoader
         return profile;
     }
 
+    public static JoltSolverProfile LoadSolver(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        var jolt = document.RootElement.TryGetProperty("jolt", out var joltElement)
+            ? joltElement : default;
+        var profile = new JoltSolverProfile
+        {
+            SpeculativeContactDistanceMeters = OptionalValue(jolt, "speculativeContactDistanceMeters", 0.02f),
+            PenetrationSlopMeters = OptionalValue(jolt, "penetrationSlopMeters", 0.02f)
+        };
+        profile.Validate();
+        return profile;
+    }
+
     private static float Value(JsonElement parent, string name) => parent.GetProperty(name).GetProperty("value").GetSingle();
     private static float OptionalValue(JsonElement parent, string name, float fallback)
     {
