@@ -32,6 +32,7 @@ public sealed class JoltVehicleContactRecorder : SyncScript
         if (RecordVehicle && (ControlProvider is null || OperatingStateProvider is null))
             throw new InvalidOperationException("Vehicle recording requires authored control and operating-state providers.");
         Recording.FixedStepSeconds = PhysicsSystem.FixedStepSeconds;
+        VehicleBody ??= Entity.Get<JoltRigidBody>();
         PhysicsSystem.FixedTickCompleted += OnFixedTickCompleted;
     }
 
@@ -47,6 +48,7 @@ public sealed class JoltVehicleContactRecorder : SyncScript
 
     private void OnFixedTickCompleted(int tick, float _)
     {
+        VehicleBody ??= Entity.Get<JoltRigidBody>();
         if (VehicleBody is null || !VehicleBody.BodyId.IsValid)
             return;
         queries ??= new JoltVehicleWheelQueries(PhysicsSystem.Host, VehicleBody.BodyId, Profile);
