@@ -43,8 +43,10 @@ public sealed class JoltPushawayController : IDisposable
     }
 
     /// Source GetPushawayEnts-compatible constructor. The provider receives
-    /// the player center and the exact Source spatial-partition expansion in
-    /// Source units, and must return only authored candidate entities.
+    /// the player center and the exact Source spatial-partition expansion
+    /// converted to the Jolt/Stride metre boundary, and must return only
+    /// authored candidate entities. The Source law itself is evaluated in
+    /// Source units below.
     public JoltPushawayController(JoltPhysicsHost host, SourcePushawayProfile profile,
         Func<Vector3, Vector3>? sourceForceToJoltImpulse,
         Func<Vector3, float, IReadOnlyList<BodyID>> propBodies,
@@ -85,13 +87,14 @@ public sealed class JoltPushawayController : IDisposable
         if (!playerActive || !float.IsFinite(deltaSeconds) || deltaSeconds <= 0f) return;
         var candidates = boundedPropBodies is null
             ? propBodies()
-            : boundedPropBodies(playerCenter, 3f);
+            : boundedPropBodies(playerCenter, SourceUnits.ToMeters(3f));
         foreach (var bodyId in candidates)
         {
             if (!isPushawayEntity(bodyId)) continue;
             if (!host.TryGetBodyMass(bodyId, out var mass)) continue;
             var propCenter = (Vector3)host.Bodies.GetRCenterOfMassPosition(bodyId);
-            var sourceForce = SourcePushawayPolicy.ComputeObstacleForce(profile, propCenter, playerCenter,
+            var sourceForce = SourcePushawayPolicy.ComputeObstacleForce(profile,
+                SourceUnits.ToSource(propCenter), SourceUnits.ToSource(playerCenter),
                 playerSpeedSourceUnitsPerSecond, mass, isMultiplayerSolid(bodyId), isRotatingDoor(bodyId));
             if (sourceForce.LengthSquared() < 1e-12f) continue;
             var impulse = sourceForceToJoltImpulse(sourceForce);

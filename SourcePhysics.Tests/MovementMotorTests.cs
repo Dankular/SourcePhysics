@@ -2839,7 +2839,35 @@ public sealed class MovementMotorTests
         host.Step();
 
         Assert.Equal(Vector3.Zero, providerCenter);
-        Assert.Equal(3f, providerExpansion);
+        Assert.Equal(SourceUnits.ToMeters(3f), providerExpansion);
+    }
+
+    [Fact]
+    public void JoltPushawayControllerEvaluatesSourceForceInSourceUnits()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize();
+        var body = host.CreateBoxBody(new Vector3(0.1f), SourceUnits.ToMeters(new Vector3(2f, 0f, 0f)),
+            JoltPhysicsSharp.MotionType.Dynamic, SourceObjectLayer.Dynamic,
+            new SourceRigidBodyProfile
+            {
+                MassKg = 1f,
+                CollisionGroup = SourceCollisionGroup.PushAway
+            });
+        var impulses = new List<SourcePhysicsImpulseEvent>();
+        host.ImpulseApplied += impulses.Add;
+        using var controller = new JoltPushawayController(host, new SourcePushawayProfile
+        {
+            PropForce = 100f,
+            MaximumPropForce = 100000f
+        }, null, () => new[] { body });
+        controller.SetPlayerState(Vector3.Zero, 100f);
+        controller.RegisterFixedStep();
+
+        host.Step();
+
+        var impulse = Assert.Single(impulses, value => value.BodyId == body.ID);
+        Assert.Equal(SourceUnits.ToMeters(50f), impulse.Impulse.X, 5);
     }
 
     private sealed class FlatGroundQueries : ISourceMovementQueries
