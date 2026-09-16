@@ -512,7 +512,11 @@ public sealed class MovementMotorTests
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
         host.Initialize(1024, 0, 1024, 256);
         var body = host.CreateBoxBody(Vector3.One, Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
-            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { GravityFactor = 0f, UserData = 77 });
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                GravityFactor = 0f, UserData = 77,
+                CallbackFlags = SourceCallbackFlags.Default | SourceCallbackFlags.GlobalTouchStatic
+            });
         host.CreateBoxBody(Vector3.One, Vector3.Zero, JoltPhysicsSharp.MotionType.Static,
             SourceObjectLayer.World, new SourceRigidBodyProfile { UserData = 88 });
         using var recording = new SourcePhysicsRecording(host);
@@ -603,7 +607,11 @@ public sealed class MovementMotorTests
         var floorBody = host.CreateBoxBody(new(2, 0.05f, 2), new(0, -0.05f, 0), JoltPhysicsSharp.MotionType.Static,
             SourceObjectLayer.World, new SourceRigidBodyProfile(), 3);
         var dynamicBody = host.CreateBoxBody(new(0.25f, 0.25f, 0.25f), new(0, 1, 0), JoltPhysicsSharp.MotionType.Dynamic,
-            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { GravityFactor = 1f }, 4);
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                GravityFactor = 1f,
+                CallbackFlags = SourceCallbackFlags.Default | SourceCallbackFlags.GlobalTouchStatic
+            }, 4);
         var added = 0;
         SourceContactEvent contact = default;
         host.Contacts.ContactAdded += value => { added++; contact = value; };
@@ -619,6 +627,25 @@ public sealed class MovementMotorTests
         Assert.Equal(MathF.Sqrt(0.25f * 0.81f), SourceSurfaceRegistry.CombineFriction(
             host.Surfaces.Get(3), host.Surfaces.Get(4)), 5);
         Assert.Equal(0.4f, SourceSurfaceRegistry.CombineRestitution(host.Surfaces.Get(3), host.Surfaces.Get(4)));
+    }
+
+    [Fact]
+    public void ContactRouterHonorsSourceGlobalTouchCallbackFlags()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(1024, 0, 1024, 256);
+        var flags = SourceCallbackFlags.Default & ~SourceCallbackFlags.GlobalTouch;
+        host.CreateBoxBody(new(2f, 0.05f, 2f), new(0, -0.05f, 0), JoltPhysicsSharp.MotionType.Static,
+            SourceObjectLayer.World, new SourceRigidBodyProfile { CallbackFlags = flags });
+        host.CreateBoxBody(new(0.25f, 0.25f, 0.25f), new(0, 1, 0), JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { CallbackFlags = flags });
+        var contacts = 0;
+        host.Contacts.ContactAdded += _ => contacts++;
+        host.Contacts.ContactPersisted += _ => contacts++;
+
+        for (var tick = 0; tick < 90; tick++) host.Step();
+
+        Assert.Equal(0, contacts);
     }
 
     [Fact]
@@ -652,7 +679,11 @@ public sealed class MovementMotorTests
             Vector3.Zero, SourceObjectLayer.World,
             new SourceStaticMeshProfile { SurfaceId = 0, TriangleSurfaceIds = new[] { 17, 17 } });
         host.CreateBoxBody(new(0.25f), new(0f, 1f, 0f), JoltPhysicsSharp.MotionType.Dynamic,
-            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { GravityFactor = 1f }, 23);
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                GravityFactor = 1f,
+                CallbackFlags = SourceCallbackFlags.Default | SourceCallbackFlags.GlobalTouchStatic
+            }, 23);
 
         for (var tick = 0; tick < 90 && frictionPair.First is null; tick++) host.Step();
 
@@ -672,7 +703,8 @@ public sealed class MovementMotorTests
         var trigger = host.CreateBoxBody(new(1, 0.05f, 1), new(0, 0, 0), JoltPhysicsSharp.MotionType.Static,
             SourceObjectLayer.Trigger);
         var dynamicBody = host.CreateBoxBody(new(0.1f, 0.1f, 0.1f), new(0, 0.5f, 0), JoltPhysicsSharp.MotionType.Dynamic,
-            SourceObjectLayer.Dynamic);
+            SourceObjectLayer.Dynamic,
+            new SourceRigidBodyProfile { CallbackFlags = SourceCallbackFlags.Default | SourceCallbackFlags.GlobalTouchStatic });
         var triggerEvents = 0;
         var sourceTriggerEvents = 0;
         host.Contacts.TriggerEntered += _ => sourceTriggerEvents++;
@@ -890,7 +922,11 @@ public sealed class MovementMotorTests
                 CollisionGroup = SourceCollisionGroup.PushAway
             });
         var player = host.CreateBoxBody(new(0.25f), Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
-            SourceObjectLayer.Player, new SourceRigidBodyProfile { GravityFactor = 0f });
+            SourceObjectLayer.Player, new SourceRigidBodyProfile
+            {
+                GravityFactor = 0f,
+                CallbackFlags = SourceCallbackFlags.Default | SourceCallbackFlags.GlobalTouchStatic
+            });
         var contacts = 0;
         host.Contacts.ContactAdded += value =>
         {

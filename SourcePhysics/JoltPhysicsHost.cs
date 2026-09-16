@@ -28,6 +28,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
     private readonly HashSet<uint> nonSolidBodies = new();
     private readonly HashSet<uint> perTriangleSurfaceBodies = new();
     private readonly HashSet<uint> sensorBodies = new();
+    private readonly HashSet<uint> staticBodies = new();
     private readonly List<Action<float>> preStepControllers = new();
     private JobSystemThreadPool? jobSystem;
     private bool initialized;
@@ -62,7 +63,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
         ContactMaterialPolicy = contactMaterialPolicy ?? new SourceContactMaterialPolicy();
         Contacts = new SourceContactRouter(
             (in Body body, SubShapeID subShapeId) => GetBodySurface(in body, subShapeId, out _),
-            ContactMaterialPolicy, IsSensor, ShouldTouchTrigger);
+            ContactMaterialPolicy, IsSensor, ShouldTouchTrigger, GetBodyCallbackFlags,
+            IsStaticBody);
         // Gravity is exposed by SourceMovementProfile.Gravity in Jolt's meter units.
         gravity = new Vector3(0f, -profile.Gravity, 0f);
     }
@@ -229,6 +231,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         Bodies.SetRestitution(id, profile.Restitution);
         Bodies.SetUserData(id, profile.UserData);
         ownedBodies.Add(id);
+        if (motionType == MotionType.Static) staticBodies.Add(id.ID);
         bodySurfaces[id.ID] = surfaceId;
         bodyProfiles[id.ID] = profile;
         bodyContents[id.ID] = profile.ContentsMask;
@@ -304,6 +307,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         Bodies.SetRestitution(id, profile.Restitution);
         Bodies.SetUserData(id, profile.UserData);
         ownedBodies.Add(id);
+        staticBodies.Add(id.ID);
         bodySurfaces[id.ID] = profile.SurfaceId;
         bodyProfiles[id.ID] = new SourceRigidBodyProfile
         {
@@ -329,6 +333,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
     }
 
     public bool IsSensor(BodyID id) => sensorBodies.Contains(id.ID);
+    internal bool IsStaticBody(BodyID id) => staticBodies.Contains(id.ID);
     public bool IsSolidBody(BodyID id) => !nonSolidBodies.Contains(id.ID);
     public SourceSolidFlags GetBodySolidFlags(BodyID id) =>
         bodySolidFlags.TryGetValue(id.ID, out var flags) ? flags : SourceSolidFlags.None;
@@ -501,6 +506,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
     {
         EnsureBody(bodyId);
         Bodies.SetMotionType(in bodyId, motionType, activate ? Activation.Activate : Activation.DontActivate);
+        if (motionType == MotionType.Static) staticBodies.Add(bodyId.ID);
+        else staticBodies.Remove(bodyId.ID);
     }
 
     public void SetLinearVelocity(BodyID bodyId, Vector3 velocity)
@@ -638,6 +645,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyCollisionGroups.Remove(id.ID);
         triggerTouchesDebris.Remove(id.ID);
         nonSolidBodies.Remove(id.ID);
+        staticBodies.Remove(id.ID);
     }
 
     /// Adds a native Jolt constraint under the host's lifetime owner. The host
@@ -695,6 +703,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyCollisionGroups.Clear();
         triggerTouchesDebris.Clear();
         nonSolidBodies.Clear();
+        staticBodies.Clear();
         sourceSimShapeFilter?.Dispose();
         sourceSimShapeFilter = null;
         preStepControllers.Clear();

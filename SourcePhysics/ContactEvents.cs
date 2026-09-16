@@ -19,6 +19,8 @@ public sealed class SourceContactRouter
     private readonly SourceContactMaterialPolicy materialPolicy;
     private readonly Func<BodyID, bool> sensorResolver;
     private readonly Func<BodyID, BodyID, bool> triggerTouchResolver;
+    private readonly Func<BodyID, SourceCallbackFlags> callbackFlagsResolver;
+    private readonly Func<BodyID, bool> staticResolver;
     public event Action<SourceContactEvent>? ContactAdded;
     public event Action<SourceContactEvent>? ContactPersisted;
     public event Action<SourceContactRemovedEvent>? ContactRemoved;
@@ -34,26 +36,33 @@ public sealed class SourceContactRouter
 
     public SourceContactRouter(Func<BodyID, SourceSurface> surfaceResolver,
         SourceContactMaterialPolicy? materialPolicy = null, Func<BodyID, bool>? sensorResolver = null,
-        Func<BodyID, BodyID, bool>? triggerTouchResolver = null)
-        : this((in Body body, SubShapeID _) => surfaceResolver(body.ID), materialPolicy, sensorResolver, triggerTouchResolver)
+        Func<BodyID, BodyID, bool>? triggerTouchResolver = null,
+        Func<BodyID, SourceCallbackFlags>? callbackFlagsResolver = null,
+        Func<BodyID, bool>? staticResolver = null)
+        : this((in Body body, SubShapeID _) => surfaceResolver(body.ID), materialPolicy, sensorResolver,
+            triggerTouchResolver, callbackFlagsResolver, staticResolver)
     {
     }
 
     public SourceContactRouter(SourceContactSurfaceResolver surfaceResolver,
         SourceContactMaterialPolicy? materialPolicy = null, Func<BodyID, bool>? sensorResolver = null,
-        Func<BodyID, BodyID, bool>? triggerTouchResolver = null)
+        Func<BodyID, BodyID, bool>? triggerTouchResolver = null,
+        Func<BodyID, SourceCallbackFlags>? callbackFlagsResolver = null,
+        Func<BodyID, bool>? staticResolver = null)
     {
         this.surfaceResolver = surfaceResolver;
         this.materialPolicy = materialPolicy ?? new SourceContactMaterialPolicy();
         this.sensorResolver = sensorResolver ?? (static _ => false);
         this.triggerTouchResolver = triggerTouchResolver ?? (static (_, _) => true);
+        this.callbackFlagsResolver = callbackFlagsResolver ?? (static _ => SourceCallbackFlags.Default);
+        this.staticResolver = staticResolver ?? (static _ => false);
     }
 
     internal void OnAdded(PhysicsSystem system, in Body a, in Body b, in ContactManifold manifold, ref ContactSettings settings)
     {
         ApplySourceCombine(a, b, manifold.SubShapeID1, manifold.SubShapeID2, ref settings);
         var contact = CreateEvent(a, b, manifold, false);
-        added.Enqueue(contact);
+        if (ShouldDispatchGlobalTouch(a.ID, b.ID)) added.Enqueue(contact);
         QueueTrigger(contact);
     }
 
@@ -61,7 +70,7 @@ public sealed class SourceContactRouter
     {
         ApplySourceCombine(a, b, manifold.SubShapeID1, manifold.SubShapeID2, ref settings);
         var contact = CreateEvent(a, b, manifold, true);
-        persisted.Enqueue(contact);
+        if (ShouldDispatchGlobalTouch(a.ID, b.ID)) persisted.Enqueue(contact);
         QueueTrigger(contact);
     }
 
@@ -81,11 +90,20 @@ public sealed class SourceContactRouter
     }
     internal void OnRemoved(PhysicsSystem _, ref SubShapeIDPair pair)
     {
-        removed.Enqueue(new(pair.Body1ID.ID, pair.Body2ID.ID));
+        if (ShouldDispatchGlobalTouch(pair.Body1ID, pair.Body2ID))
+            removed.Enqueue(new(pair.Body1ID.ID, pair.Body2ID.ID));
         if (sensorResolver(pair.Body1ID) && triggerTouchResolver(pair.Body1ID, pair.Body2ID))
             triggerExited.Enqueue(new(pair.Body1ID.ID, pair.Body2ID.ID));
         else if (sensorResolver(pair.Body2ID) && triggerTouchResolver(pair.Body2ID, pair.Body1ID))
             triggerExited.Enqueue(new(pair.Body2ID.ID, pair.Body1ID.ID));
+    }
+
+    private bool ShouldDispatchGlobalTouch(BodyID first, BodyID second)
+    {
+        var flags = callbackFlagsResolver(first) | callbackFlagsResolver(second);
+        if ((flags & SourceCallbackFlags.GlobalTouch) == 0) return false;
+        return (!staticResolver(first) && !staticResolver(second)) ||
+            (flags & SourceCallbackFlags.GlobalTouchStatic) != 0;
     }
 
     private void QueueTrigger(in SourceContactEvent contact)
