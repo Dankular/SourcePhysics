@@ -43,4 +43,34 @@ public sealed class JoltVehicleWheelQueriesTests
             Assert.True(contact.SuspensionLengthMeters > 0f);
         });
     }
+
+    [Fact]
+    public void WheelTraceTransformsVehicleDownDirectionWithVehiclePose()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(2048, 0, 2048, 256);
+        host.CreateBoxBody(new(5f, 0.1f, 5f), new(0f, -0.1f, 0f), MotionType.Static,
+            SourceObjectLayer.World);
+        var roll = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, MathF.PI / 2f);
+        var vehicleBody = host.CreateBoxBody(new(0.5f, 0.5f, 0.5f), new(0f, 2f, 0f), roll,
+            MotionType.Dynamic, SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { MassKg = 100f });
+        var profile = new SourceVehicleProfile
+        {
+            AxleCount = 1,
+            WheelsPerAxle = 1,
+            Axles = new[]
+            {
+                new SourceVehicleAxleProfile
+                {
+                    Wheels = new SourceVehicleWheelProfile { RadiusSourceUnits = 10f }
+                }
+            }
+        };
+        var queries = new JoltVehicleWheelQueries(host, vehicleBody, profile);
+
+        var contacts = queries.Trace(new[] { 120f });
+
+        Assert.Single(contacts);
+        Assert.False(contacts[0].InContact);
+    }
 }

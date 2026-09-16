@@ -33,6 +33,10 @@ public sealed class JoltVehicleWheelQueries
         if (rayLengthsSourceUnits.Count != profile.WheelCount)
             throw new ArgumentException("Wheel ray-length count must match the vehicle wheel count.", nameof(rayLengthsSourceUnits));
         var transform = (Matrix4x4)host.Bodies.GetRCenterOfMassTransform(vehicleBody);
+        var vehicleDown = Vector3.TransformNormal(-Vector3.UnitY, transform);
+        if (vehicleDown.LengthSquared() < 1e-12f)
+            throw new InvalidOperationException("Vehicle transform produced an invalid wheel ray direction.");
+        vehicleDown = Vector3.Normalize(vehicleDown);
         var contacts = new SourceVehicleWheelContact[profile.WheelCount];
         var wheelIndex = 0;
         foreach (var axle in profile.Axles)
@@ -47,7 +51,7 @@ public sealed class JoltVehicleWheelQueries
                 else if (profile.WheelsPerAxle == 2) local -= axle.RaytraceOffsetSourceUnits;
                 var start = Vector3.Transform(SourceUnits.ToMeters(local), transform);
                 var lengthMeters = SourceUnits.ToMeters(rayLength);
-                if (queries.Cast(start, -Vector3.UnitY, lengthMeters, out var hit))
+                if (queries.Cast(start, vehicleDown, lengthMeters, out var hit))
                 {
                     var surface = host.Surfaces.Get(hit.SurfaceId);
                     contacts[wheelIndex] = new(true, hit.Position, hit.Normal,
