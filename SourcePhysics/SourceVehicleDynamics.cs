@@ -320,6 +320,30 @@ public static class SourceVehicleDynamics
         return directionalDrag * (frictionDrag * deltaSeconds);
     }
 
+    /// Exact CPhysics_Airboat::DoSimulationTurbine impulse law. The supplied
+    /// forward vector is the world-space core Z column; it is intentionally
+    /// not normalized or reconstructed by this contract.
+    public static Vector3 ComputeAirboatThrustImpulse(Vector3 forwardWorld,
+        float thrust, bool weakJump, bool airborne, float bodyMassKg, float deltaSeconds)
+    {
+        if (!float.IsFinite(forwardWorld.X) || !float.IsFinite(forwardWorld.Y) ||
+            !float.IsFinite(forwardWorld.Z))
+            throw new ArgumentOutOfRangeException(nameof(forwardWorld));
+        if (!float.IsFinite(thrust)) throw new ArgumentOutOfRangeException(nameof(thrust));
+        if (!float.IsFinite(bodyMassKg) || bodyMassKg < 0f)
+            throw new ArgumentOutOfRangeException(nameof(bodyMassKg));
+        if (!float.IsFinite(deltaSeconds) || deltaSeconds < 0f)
+            throw new ArgumentOutOfRangeException(nameof(deltaSeconds));
+
+        var effectiveThrust = thrust;
+        if (weakJump || (airborne && effectiveThrust < 0f)) effectiveThrust *= 0.5f;
+        if (forwardWorld.Y < -0.5f && effectiveThrust > 0f)
+            effectiveThrust *= 1f + forwardWorld.Y;
+        else if (forwardWorld.Y > 0.5f && effectiveThrust < 0f)
+            effectiveThrust *= 1f - forwardWorld.Y;
+        return forwardWorld * (effectiveThrust * bodyMassKg * deltaSeconds);
+    }
+
     private static void ValidateAirboatDragInputs(Vector3 localVelocity,
         float speedMetersPerSecond, float bodyMassKg, float deltaSeconds)
     {

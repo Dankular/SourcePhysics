@@ -2893,6 +2893,22 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceAirboatThrustMatchesWeakJumpAirborneAndSlopeBranches()
+    {
+        var uphill = SourceVehicleDynamics.ComputeAirboatThrustImpulse(
+            new(0f, -0.75f, 0.5f), 10f, false, false, 2f, 0.1f);
+        Assert.Equal(new Vector3(0f, -0.375f, 0.25f), uphill);
+
+        var reverseAirborne = SourceVehicleDynamics.ComputeAirboatThrustImpulse(
+            new(0f, 0.75f, 0.5f), -10f, false, true, 2f, 0.1f);
+        Assert.Equal(new Vector3(0f, -0.1875f, -0.125f), reverseAirborne);
+
+        var weak = SourceVehicleDynamics.ComputeAirboatThrustImpulse(
+            Vector3.UnitZ, 10f, true, false, 2f, 0.1f);
+        Assert.Equal(new Vector3(0f, 0f, 1f), weak);
+    }
+
+    [Fact]
     public void SourcePushawayPolicyMatchesSourceForceClampAndSpeedGate()
     {
         var profile = new SourcePushawayProfile();
