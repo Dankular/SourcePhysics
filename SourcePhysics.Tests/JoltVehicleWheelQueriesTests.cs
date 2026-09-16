@@ -100,5 +100,10 @@ public sealed class JoltVehicleWheelQueriesTests
         var velocity = queries.GetContactBodyPointVelocity(in contact);
         Assert.Equal(SourceUnits.ToMeters(60f), velocity.X, 3);
         Assert.Equal(velocity, contact.SurfaceVelocityMetersPerSecond);
+
+        host.SetLinearVelocity(vehicleBody, new(SourceUnits.ToMeters(100f), 0f, 0f));
+        var skid = Assert.Single(queries.BuildSkidSamples(new[] { contact }));
+        Assert.Equal(40f, skid.ContactPointVelocitySourceUnitsPerSecond.X, 3);
+        Assert.Equal(0, skid.SurfaceId);
     }
 }

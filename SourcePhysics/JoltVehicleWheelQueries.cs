@@ -81,6 +81,32 @@ public sealed class JoltVehicleWheelQueries
         return GetBodyPointVelocity(contact.BodyId, contact.ContactPointMeters);
     }
 
+    /// Converts wheel contact-point relative velocity into the Source units
+    /// consumed by UpdateSkidding. Surface velocity is sampled by Trace;
+    /// no Source skid reduction or threshold is applied here.
+    public IReadOnlyList<SourceVehicleWheelSkidSample> BuildSkidSamples(
+        IReadOnlyList<SourceVehicleWheelContact> contacts)
+    {
+        ArgumentNullException.ThrowIfNull(contacts);
+        if (contacts.Count != profile.WheelCount)
+            throw new ArgumentException("Wheel contact count must match the vehicle wheel count.", nameof(contacts));
+        var samples = new SourceVehicleWheelSkidSample[contacts.Count];
+        for (var index = 0; index < contacts.Count; index++)
+        {
+            var contact = contacts[index];
+            if (!contact.InContact)
+            {
+                samples[index] = new(false, Vector3.Zero, 0);
+                continue;
+            }
+            var vehicleVelocity = GetBodyPointVelocity((int)vehicleBody.ID, contact.ContactPointMeters);
+            var relativeVelocitySourceUnits = SourceUnits.ToSource(
+                vehicleVelocity - contact.SurfaceVelocityMetersPerSecond);
+            samples[index] = new(true, relativeVelocitySourceUnits, contact.SurfaceId);
+        }
+        return samples;
+    }
+
     private Vector3 GetBodyPointVelocity(int bodyIdValue, Vector3 contactPoint)
     {
         var bodyId = new BodyID(unchecked((uint)bodyIdValue));
