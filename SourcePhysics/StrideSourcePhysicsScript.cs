@@ -18,6 +18,8 @@ public sealed class StrideSourcePhysicsScript : SyncScript
     public SourcePhysicsRecording? PhysicsRecording { get; private set; }
     public SourcePhysicsPerformanceRecorder? PerformanceRecording { get; private set; }
     public event Action<int, float>? FixedTick;
+    /// Emitted after Jolt integration and contact flushing for the tick.
+    public event Action<int, float>? FixedTickCompleted;
     private SourceFixedStepClock? clock;
     private bool started;
     private readonly List<Action<float>> fixedTickParticipants = new();
@@ -63,6 +65,7 @@ public sealed class StrideSourcePhysicsScript : SyncScript
         // authoritative lifecycle and requires fresh registrations.
         fixedTickParticipants.Clear();
         FixedTick = null;
+        FixedTickCompleted = null;
         started = false;
     }
 
@@ -87,6 +90,7 @@ public sealed class StrideSourcePhysicsScript : SyncScript
             PhysicsRecording?.Capture(tick);
             if (PerformanceRecording is not null)
                 PerformanceRecording.Capture(tick, Host.LastStepMetrics);
+            FixedTickCompleted?.Invoke(tick, dt);
         });
     }
 }

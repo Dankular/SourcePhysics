@@ -89,6 +89,21 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void StridePhysicsHostEmitsCompletionAfterAuthoritativeStep()
+    {
+        var script = new StrideSourcePhysicsScript { FixedStepSeconds = 1f / 66f };
+        var order = new List<string>();
+        script.FixedTick += (_, _) => order.Add("pre");
+        script.FixedTickCompleted += (_, _) => order.Add("post");
+        script.EnsureStarted();
+
+        script.Advance(script.FixedStepSeconds);
+
+        Assert.Equal(new[] { "pre", "post" }, order);
+        script.Cancel();
+    }
+
+    [Fact]
     public void JoltSweepReportsRotatedSlopeNormal()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
