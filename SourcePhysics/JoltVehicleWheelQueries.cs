@@ -65,4 +65,26 @@ public sealed class JoltVehicleWheelQueries
         }
         return contacts;
     }
+
+    /// Returns the contacted body's world point velocity in Jolt metres per
+    /// second. The vehicle controller can convert it explicitly to Source
+    /// units and apply the title's relative-contact law.
+    public Vector3 GetContactBodyPointVelocity(in SourceVehicleWheelContact contact)
+    {
+        if (!contact.InContact || contact.BodyId < 0)
+            return Vector3.Zero;
+        var bodyId = new BodyID(unchecked((uint)contact.BodyId));
+        if (!host.Bodies.IsAdded(bodyId))
+            return Vector3.Zero;
+        var contactPoint = contact.ContactPointMeters;
+        host.Bodies.GetPointVelocity(in bodyId, in contactPoint, out var velocity);
+        if (velocity.LengthSquared() < 1e-12f)
+        {
+            var angular = host.Bodies.GetAngularVelocity(bodyId);
+            var center = (Vector3)host.Bodies.GetRCenterOfMassPosition(bodyId);
+            velocity = host.Bodies.GetLinearVelocity(bodyId) +
+                Vector3.Cross(angular, contact.ContactPointMeters - center);
+        }
+        return velocity;
+    }
 }

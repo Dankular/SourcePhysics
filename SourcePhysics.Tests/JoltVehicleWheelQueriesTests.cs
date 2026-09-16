@@ -74,4 +74,30 @@ public sealed class JoltVehicleWheelQueriesTests
         Assert.Single(contacts);
         Assert.False(contacts[0].InContact);
     }
+
+    [Fact]
+    public void WheelContactExposesMovingPlatformPointVelocity()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(2048, 0, 2048, 256);
+        var platform = host.CreateBoxBody(new(5f, 0.1f, 5f), new(0f, -0.1f, 0f), MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { MassKg = 1000f, GravityFactor = 0f });
+        host.SetLinearVelocity(platform, new(SourceUnits.ToMeters(60f), 0f, 0f));
+        var vehicleBody = host.CreateBoxBody(new(0.5f, 0.5f, 0.5f), new(0f, 2f, 0f), MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { MassKg = 100f, GravityFactor = 0f });
+        var profile = new SourceVehicleProfile
+        {
+            AxleCount = 1,
+            WheelsPerAxle = 1,
+            Axles = new[] { new SourceVehicleAxleProfile { Wheels = new SourceVehicleWheelProfile { RadiusSourceUnits = 10f } } }
+        };
+        var queries = new JoltVehicleWheelQueries(host, vehicleBody, profile);
+
+        var contact = Assert.Single(queries.Trace(new[] { 120f }));
+
+        Assert.True(contact.InContact);
+        Assert.Equal((int)platform.ID, contact.BodyId);
+        var velocity = queries.GetContactBodyPointVelocity(in contact);
+        Assert.Equal(SourceUnits.ToMeters(60f), velocity.X, 3);
+    }
 }
