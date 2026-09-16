@@ -1274,8 +1274,11 @@ public sealed class MovementMotorTests
         var weapon = new JoltHitscanWeapon();
         weapon.Initialize(host);
         var triggerHits = new List<HitscanHit>();
+        var triggerTarget = new DamageTargetProbe();
         var eventOrder = new List<string>();
         weapon.TriggerHit += hit => { triggerHits.Add(hit); eventOrder.Add("trigger"); };
+        weapon.TriggerDamageTargetResolver = hit => hit.BodyId == unchecked((int)trigger.ID) ? triggerTarget : null;
+        weapon.BulletForceResolver = _ => 100f;
         weapon.Impact += _ => eventOrder.Add("impact");
 
         var info = new SourceFireBulletsInfo(1, Vector3.Zero, Vector3.UnitZ, Vector3.Zero, 10f, 1, Damage: 5f);
@@ -1283,6 +1286,10 @@ public sealed class MovementMotorTests
 
         Assert.Equal(trigger.ID, unchecked((uint)Assert.Single(triggerHits).BodyId));
         Assert.Equal(new[] { "trigger", "impact" }, eventOrder);
+        Assert.Equal(1, triggerTarget.TraceCount);
+        Assert.Equal(1, triggerTarget.TakeDamageCount);
+        Assert.Equal(5f, triggerTarget.LastDamage.Damage);
+        Assert.Equal(new Vector3(0f, 0f, 100f), triggerTarget.LastDamage.DamageForce);
     }
 
     [Fact]

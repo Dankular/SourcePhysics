@@ -45,6 +45,10 @@ public sealed class JoltHitscanWeapon : SyncScript
     /// Resolves a traced body/hitbox to the title's damage target. When set,
     /// FireBullets executes Source TraceAttack/ApplyMultiDamage ordering.
     public Func<HitscanHit, ISourceDamageTarget?>? DamageTargetResolver { get; set; }
+    /// Source TraceAttackToTriggers target resolver. Trigger damage is opt-in
+    /// because trigger entities are title-owned, but the dispatch ordering and
+    /// payload are fixed by the shared Source FireBullets path.
+    public Func<HitscanHit, ISourceDamageTarget?>? TriggerDamageTargetResolver { get; set; }
     /// Resolves the Source entity identity used by CMultiDamage. When omitted,
     /// the Jolt body ID is used as a conservative fallback.
     public Func<HitscanHit, int>? DamageTargetIdResolver { get; set; }
@@ -155,6 +159,7 @@ public sealed class JoltHitscanWeapon : SyncScript
         if (resolvedPlayerDamage < 0)
             throw new InvalidOperationException("AmmoDefinitionResolver returned a negative player damage.");
         var resolvedInfo = info with { PlayerDamage = resolvedPlayerDamage, DamageType = resolvedDamageType };
+        var triggerInfo = info;
         var manipulator = new SourceShotManipulator(info.Direction);
         var results = new ShotResult[info.Shots];
         var multiDamage = new SourceMultiDamageAccumulator();
@@ -180,7 +185,10 @@ public sealed class JoltHitscanWeapon : SyncScript
                     new Vector3(3f), out hit, additionalIgnore)
                 : query.Cast(info.OriginMeters, shotDirection, info.DistanceMeters, out hit, additionalIgnore);
             EmitTriggerHits(info.OriginMeters, shotDirection,
-                didHit ? info.DistanceMeters * hit.Fraction : info.DistanceMeters, additionalIgnore);
+                didHit ? info.DistanceMeters * hit.Fraction : info.DistanceMeters, additionalIgnore,
+                trigger => DispatchTriggerDamage(trigger, didHit ? hit : new HitscanHit(
+                    triggerInfo.OriginMeters + shotDirection * triggerInfo.DistanceMeters, -shotDirection,
+                    -1, 0, 1f, Contents: SourceContents.Solid), in triggerInfo, resolvedDamageType));
             if (didHit) RefineHitbox(info.OriginMeters, shotDirection, info.DistanceMeters, ref hit);
             results[shot] = new(didHit, shotDirection, hit);
             if (didHit) Hit?.Invoke(hit);
@@ -313,11 +321,32 @@ public sealed class JoltHitscanWeapon : SyncScript
     }
 
     private void EmitTriggerHits(Vector3 origin, Vector3 direction, float distance,
-        int? ignoredBodyIdOverride = null)
+        int? ignoredBodyIdOverride = null, Action<HitscanHit>? triggerDamage = null)
     {
         if (triggerQueries is null) return;
         foreach (var trigger in triggerQueries.CastTriggers(origin, direction, distance, ignoredBodyIdOverride))
+        {
             TriggerHit?.Invoke(trigger);
+            triggerDamage?.Invoke(trigger);
+        }
+    }
+
+    private void DispatchTriggerDamage(in HitscanHit trigger, in HitscanHit solidHit,
+        in SourceFireBulletsInfo info, int damageType)
+    {
+        if (TriggerDamageTargetResolver?.Invoke(trigger) is not { } target) return;
+        var bulletForce = BulletForceResolver?.Invoke(info.AmmoType) ?? 0f;
+        if (!float.IsFinite(bulletForce) || bulletForce < 0f)
+            throw new InvalidOperationException("BulletForceResolver returned an invalid force value.");
+        var damageForce = Vector3.Normalize(info.Direction) * bulletForce * PhysicsPushScale * info.DamageForceScale;
+        var damageInfo = new SourceDamageInfo(info.Damage, info.Damage, damageForce,
+            solidHit.Position, Vector3.Zero, damageType, info.AmmoType,
+            InflictorBodyId: info.InflictorBodyId, AttackerBodyId: info.AttackerBodyId,
+            WeaponBodyId: info.WeaponBodyId);
+        var targetId = DamageTargetIdResolver?.Invoke(trigger) ?? trigger.BodyId;
+        var accumulator = new SourceMultiDamageAccumulator();
+        accumulator.DispatchTraceAttack(targetId, target, in damageInfo, info.Direction, in trigger);
+        accumulator.ApplyMultiDamage();
     }
 
     private static bool IsFinite(Vector3 value) =>
