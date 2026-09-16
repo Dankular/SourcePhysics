@@ -12,6 +12,7 @@ public sealed class JoltPushawayController : IDisposable
     private readonly SourcePushawayProfile profile;
     private readonly Func<Vector3, Vector3> sourceForceToJoltImpulse;
     private readonly Func<IReadOnlyList<BodyID>> propBodies;
+    private readonly Func<Vector3, float, IReadOnlyList<BodyID>>? boundedPropBodies;
     private readonly Func<BodyID, bool> isRotatingDoor;
     private readonly Func<BodyID, bool> isMultiplayerSolid;
     private readonly Func<BodyID, bool> isPushawayEntity;
@@ -33,11 +34,27 @@ public sealed class JoltPushawayController : IDisposable
         this.profile.Validate();
         this.sourceForceToJoltImpulse = sourceForceToJoltImpulse ?? SourcePhysicsImpulseConversion.ToJolt;
         this.propBodies = propBodies ?? throw new ArgumentNullException(nameof(propBodies));
+        boundedPropBodies = null;
         this.isRotatingDoor = isRotatingDoor ?? (static _ => false);
         this.isMultiplayerSolid = isMultiplayerSolid ?? (static _ => true);
         this.isPushawayEntity = isPushawayEntity ?? (bodyId =>
             host.GetBodyCollisionGroup(bodyId) == SourceCollisionGroup.PushAway || this.isRotatingDoor(bodyId));
         preStep = ApplyAtFixedStep;
+    }
+
+    /// Source GetPushawayEnts-compatible constructor. The provider receives
+    /// the player center and the exact Source spatial-partition expansion in
+    /// Source units, and must return only authored candidate entities.
+    public JoltPushawayController(JoltPhysicsHost host, SourcePushawayProfile profile,
+        Func<Vector3, Vector3>? sourceForceToJoltImpulse,
+        Func<Vector3, float, IReadOnlyList<BodyID>> propBodies,
+        Func<BodyID, bool>? isRotatingDoor = null,
+        Func<BodyID, bool>? isMultiplayerSolid = null,
+        Func<BodyID, bool>? isPushawayEntity = null)
+        : this(host, profile, sourceForceToJoltImpulse, Array.Empty<BodyID>, isRotatingDoor,
+            isMultiplayerSolid, isPushawayEntity)
+    {
+        this.boundedPropBodies = propBodies ?? throw new ArgumentNullException(nameof(propBodies));
     }
 
     public void SetPlayerState(Vector3 center, float speedSourceUnitsPerSecond, bool active = true)
@@ -66,7 +83,10 @@ public sealed class JoltPushawayController : IDisposable
     private void ApplyAtFixedStep(float deltaSeconds)
     {
         if (!playerActive || !float.IsFinite(deltaSeconds) || deltaSeconds <= 0f) return;
-        foreach (var bodyId in propBodies())
+        var candidates = boundedPropBodies is null
+            ? propBodies()
+            : boundedPropBodies(playerCenter, 3f);
+        foreach (var bodyId in candidates)
         {
             if (!isPushawayEntity(bodyId)) continue;
             if (!host.TryGetBodyMass(bodyId, out var mass)) continue;

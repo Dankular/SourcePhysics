@@ -2816,6 +2816,32 @@ public sealed class MovementMotorTests
         Assert.DoesNotContain(impulses, value => value.BodyId == body.ID);
     }
 
+    [Fact]
+    public void JoltPushawayControllerPassesSourcePartitionExpansionToCandidateProvider()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize();
+        var body = host.CreateBoxBody(new Vector3(0.1f), new Vector3(0.1f, 0f, 0f),
+            JoltPhysicsSharp.MotionType.Dynamic, SourceObjectLayer.Dynamic,
+            new SourceRigidBodyProfile { MassKg = 1f, CollisionGroup = SourceCollisionGroup.PushAway });
+        var providerCenter = default(Vector3);
+        var providerExpansion = 0f;
+        using var controller = new JoltPushawayController(host, new SourcePushawayProfile(), null,
+            (center, expansion) =>
+            {
+                providerCenter = center;
+                providerExpansion = expansion;
+                return new[] { body };
+            });
+        controller.SetPlayerState(Vector3.Zero, 100f);
+        controller.RegisterFixedStep();
+
+        host.Step();
+
+        Assert.Equal(Vector3.Zero, providerCenter);
+        Assert.Equal(3f, providerExpansion);
+    }
+
     private sealed class FlatGroundQueries : ISourceMovementQueries
     {
         public MovementState State { get; set; }
