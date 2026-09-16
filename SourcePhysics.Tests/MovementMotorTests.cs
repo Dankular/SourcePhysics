@@ -2053,6 +2053,17 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void ProjectileRejectsMalformedPenetrationResult()
+    {
+        var projectile = new SourceProjectileMotor(new SourceProjectileProfile
+        {
+            GravityScale = 0f, PenetrationPower = 10f, MaximumPenetrations = 1
+        }, new MalformedPenetrationQueries(), Vector3.Zero, Vector3.UnitX);
+
+        Assert.Throws<InvalidDataException>(() => projectile.Tick(0.1f));
+    }
+
+    [Fact]
     public void MovementRecordingsRoundTripAndCompareDeterministically()
     {
         var recording = new MovementRecording();
@@ -3024,6 +3035,24 @@ public sealed class MovementMotorTests
             exitPosition = new(2, 0, 0);
             exitVelocity = incomingVelocity;
             consumedPower = 2f;
+            return true;
+        }
+    }
+
+    private sealed class MalformedPenetrationQueries : IProjectileQueries, IProjectilePenetrationQueries
+    {
+        public bool Sweep(Vector3 start, Vector3 end, out ProjectileHit hit)
+        {
+            hit = new(new(0.5f, 0, 0), -Vector3.UnitX, 5, 0f, ThicknessInches: 1f);
+            return true;
+        }
+
+        public bool TryPenetrate(Vector3 entryPosition, in ProjectileHit entryHit, Vector3 incomingVelocity,
+            float availablePower, out Vector3 exitPosition, out Vector3 exitVelocity, out float consumedPower)
+        {
+            exitPosition = entryPosition;
+            exitVelocity = incomingVelocity;
+            consumedPower = availablePower + 1f;
             return true;
         }
     }

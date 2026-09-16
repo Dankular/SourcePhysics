@@ -97,6 +97,7 @@ public sealed class SourceProjectileMotor
             penetrator.TryPenetrate(hit.Position, in hit, velocity, availablePenetrationPower,
                 out var exitPosition, out var exitVelocity, out var consumedPower))
         {
+            ValidatePenetrationResult(exitPosition, exitVelocity, consumedPower, availablePenetrationPower);
             var remainingPower = MathF.Max(0f, availablePenetrationPower - consumedPower);
             State = new(exitPosition, exitVelocity, remainingPower > 0f, State.Bounces,
                 State.Penetrations + 1, remainingPower);
@@ -150,4 +151,14 @@ public sealed class SourceProjectileMotor
 
     private static bool IsFinite(Vector3 value) =>
         float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
+
+    private static void ValidatePenetrationResult(Vector3 exitPosition, Vector3 exitVelocity,
+        float consumedPower, float availablePower)
+    {
+        if (!IsFinite(exitPosition) || !IsFinite(exitVelocity) ||
+            !float.IsFinite(consumedPower) || consumedPower <= 0f || consumedPower > availablePower)
+        {
+            throw new InvalidDataException("Projectile penetration query returned an invalid result.");
+        }
+    }
 }
