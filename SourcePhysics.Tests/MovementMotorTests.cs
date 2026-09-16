@@ -2025,6 +2025,17 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void ProjectileMotorRejectsNonFiniteTickAndSpawnState()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new SourceProjectileMotor(
+            new SourceProjectileProfile(), new NoHitProjectileQueries(),
+            new Vector3(float.NaN, 0f, 0f), Vector3.Zero));
+        var projectile = new SourceProjectileMotor(new SourceProjectileProfile(),
+            new NoHitProjectileQueries(), Vector3.Zero, Vector3.Zero);
+        Assert.Throws<ArgumentOutOfRangeException>(() => projectile.Tick(float.NaN));
+    }
+
+    [Fact]
     public void ProjectilePenetrationUsesExplicitQueryAndTracksBudget()
     {
         var queries = new PenetratingProjectileQueries();

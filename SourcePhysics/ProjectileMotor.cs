@@ -72,13 +72,17 @@ public sealed class SourceProjectileMotor
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(queries);
         profile.Validate();
+        if (!IsFinite(position) || !IsFinite(velocity))
+            throw new ArgumentOutOfRangeException(nameof(position));
         this.profile = profile; this.queries = queries;
         State = new(position, velocity, true, 0);
     }
 
     public ProjectileHit? Tick(float dt)
     {
-        if (!State.Active || dt <= 0f) return null;
+        if (!float.IsFinite(dt) || dt <= 0f)
+            throw new ArgumentOutOfRangeException(nameof(dt));
+        if (!State.Active) return null;
         var gravity = Vector3.UnitY * -SourceUnits.ToMeters(profile.GravitySourceUnitsPerSecondSquared) * profile.GravityScale;
         var velocity = State.Velocity + gravity * dt;
         var maxVelocity = SourceUnits.ToMeters(profile.MaximumVelocitySourceUnitsPerSecond);
@@ -143,4 +147,7 @@ public sealed class SourceProjectileMotor
         }
         State = State with { Position = position, Velocity = reflected, Bounces = State.Bounces + 1 };
     }
+
+    private static bool IsFinite(Vector3 value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
 }
