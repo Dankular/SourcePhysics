@@ -23,7 +23,8 @@ public readonly record struct WeaponShotFrame(
     bool SuppressSurfaceImpact = false,
     bool DamageSuppressed = false,
     Vector3 DamageForce = default,
-    Vector3 TracerDestination = default);
+    Vector3 TracerDestination = default,
+    SourceShotTraceShape TraceShape = SourceShotTraceShape.Ray);
 
 public sealed class WeaponRecording
 {
@@ -35,7 +36,8 @@ public sealed class WeaponRecording
         bool hit, HitscanHit hitData) => Frames.Add(new(tick, shotIndex, randomSeed, origin, direction, hit, hitData));
 
     public void Capture(int tick, int shotIndex, int randomSeed, Vector3 origin, Vector3 direction,
-        bool hit, HitscanHit hitData, in SourceFireBulletsInfo info, SourceFireBulletsImpact? impact)
+        bool hit, HitscanHit hitData, in SourceFireBulletsInfo info, SourceFireBulletsImpact? impact,
+        SourceShotTraceShape traceShape = SourceShotTraceShape.Ray)
     {
         Frames.Add(new(tick, shotIndex, randomSeed, origin, direction, hit, hitData,
             info.AmmoType, info.PlayerDamage, impact?.Damage ?? 0f,
@@ -43,7 +45,8 @@ public sealed class WeaponRecording
             info.DamageForceScale, info.PrimaryAttack, info.TracerFrequency,
             impact?.HitWater ?? false, impact?.SuppressSurfaceImpact ?? false,
             impact?.DamageSuppressed ?? false, impact?.DamageForce ?? default,
-            impact?.TracerDestination ?? (hit ? hitData.Position : origin + direction * info.DistanceMeters)));
+            impact?.TracerDestination ?? (hit ? hitData.Position : origin + direction * info.DistanceMeters),
+            traceShape));
     }
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
@@ -104,6 +107,7 @@ public static class WeaponParityComparator
             if (left.DamageSuppressed != right.DamageSuppressed) errors.Add(new(left.Tick, left.ShotIndex, "damage-suppressed"));
             if (left.DamageForce != right.DamageForce) errors.Add(new(left.Tick, left.ShotIndex, "damage-force"));
             if (left.TracerDestination != right.TracerDestination) errors.Add(new(left.Tick, left.ShotIndex, "tracer-destination"));
+            if (left.TraceShape != right.TraceShape) errors.Add(new(left.Tick, left.ShotIndex, "trace-shape"));
 
             var directionError = Vector3.Distance(left.Direction, right.Direction);
             directionSum += directionError * directionError;

@@ -33,6 +33,12 @@ public enum SourceAmmoFlags
     InterpretPlayerDamageAsDamageToPlayer = 0x2
 }
 
+public enum SourceShotTraceShape
+{
+    Ray,
+    PlayerAlternatingHull
+}
+
 /// The AmmoDef fields consumed by the shared Source FireBullets path. The
 /// title supplies these values; the physics bridge never invents an ammo
 /// table from an integer ammo index.

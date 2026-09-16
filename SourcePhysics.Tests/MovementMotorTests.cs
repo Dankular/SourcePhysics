@@ -1869,6 +1869,23 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void WeaponComparatorReportsSourceTraceShapeDivergence()
+    {
+        var expected = new WeaponRecording();
+        var info = new SourceFireBulletsInfo(1, Vector3.Zero, Vector3.UnitZ,
+            Vector3.Zero, 1f, 0);
+        expected.Capture(1, 1, 2, Vector3.Zero, Vector3.UnitZ, false, default,
+            in info, null, SourceShotTraceShape.PlayerAlternatingHull);
+        var actual = new WeaponRecording();
+        actual.Capture(1, 1, 2, Vector3.Zero, Vector3.UnitZ, false, default);
+
+        var comparison = WeaponParityComparator.Compare(expected.Frames, actual.Frames);
+
+        Assert.Contains(comparison.Errors, error => error.Field == "trace-shape");
+        Assert.False(comparison.Passes(0f, 0f));
+    }
+
+    [Fact]
     public void AuthoredVolumesClassifyWaterAndLadders()
     {
         var volumes = new SourceMovementVolumes();

@@ -157,10 +157,13 @@ public sealed class JoltHitscanWeapon : SyncScript
                 ? manipulator.ShotDirection
                 : manipulator.ApplySpread(info.Spread, 0f, 0f, 0f,
                     new SourceUniformRandomStream(shotSeed).RandomFloat);
-            var didHit = ShooterIsPlayer && info.Shots > 1 && (shot & 1) != 0
+            var useHull = ShooterIsPlayer && info.Shots > 1 && (shot & 1) != 0;
+            var traceShape = useHull ? SourceShotTraceShape.PlayerAlternatingHull : SourceShotTraceShape.Ray;
+            HitscanHit hit;
+            var didHit = useHull
                 ? query.CastHull(info.OriginMeters,
                     info.OriginMeters + shotDirection * info.DistanceMeters,
-                    new Vector3(3f), out var hit)
+                    new Vector3(3f), out hit)
                 : query.Cast(info.OriginMeters, shotDirection, info.DistanceMeters, out hit);
             EmitTriggerHits(info.OriginMeters, shotDirection,
                 didHit ? info.DistanceMeters * hit.Fraction : info.DistanceMeters);
@@ -171,7 +174,7 @@ public sealed class JoltHitscanWeapon : SyncScript
             if (!result.Hit)
             {
                 Recording?.Capture(RecordingTick, shot, shotSeed, info.OriginMeters, result.Direction,
-                    false, result.HitData, in resolvedInfo, null);
+                    false, result.HitData, in resolvedInfo, null, traceShape);
                 continue;
             }
             var startedInWater = IsWaterPoint?.Invoke(info.OriginMeters) ?? false;
@@ -225,7 +228,7 @@ public sealed class JoltHitscanWeapon : SyncScript
                 ForceDropIfCarried?.Invoke(result.HitData);
             Impact?.Invoke(impact);
             Recording?.Capture(RecordingTick, shot, shotSeed, info.OriginMeters, result.Direction,
-                true, result.HitData, in resolvedInfo, impact);
+                true, result.HitData, in resolvedInfo, impact, traceShape);
         }
         multiDamage.ApplyMultiDamage();
         if (Recording is not null) RecordingTick++;
