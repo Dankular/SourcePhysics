@@ -19,6 +19,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
     private readonly List<Constraint> ownedConstraints = new();
     private readonly Dictionary<uint, int> bodySurfaces = new();
     private readonly Dictionary<uint, SourceRigidBodyProfile> bodyProfiles = new();
+    private readonly Dictionary<uint, SourceDragBasis> bodyDragBases = new();
     private readonly Dictionary<uint, SourceContents> bodyContents = new();
     private readonly Dictionary<uint, SourceObjectLayer> bodyLayers = new();
     private readonly Dictionary<uint, SourceObjectLayer> bodyRequestedLayers = new();
@@ -171,10 +172,12 @@ public sealed partial class JoltPhysicsHost : IDisposable
         foreach (var id in ownedBodies)
         {
             if (!bodyProfiles.TryGetValue(id.ID, out var profile) || !profile.EnableDrag || !Bodies.IsAdded(id)) continue;
-            var linearScale = MathF.Exp(-MathF.Max(0f, profile.DragCoefficientPerSecond) * stepSeconds);
-            var angularScale = MathF.Exp(-MathF.Max(0f, profile.RollingDragCoefficientPerSecond) * stepSeconds);
-            var linear = Bodies.GetLinearVelocity(id) * linearScale;
-            var angular = Bodies.GetAngularVelocity(id) * angularScale;
+            if (!bodyDragBases.TryGetValue(id.ID, out var basis)) continue;
+            var transform = (Matrix4x4)Bodies.GetRCenterOfMassTransform(id);
+            var rotation = Quaternion.CreateFromRotationMatrix(transform);
+            var linear = Bodies.GetLinearVelocity(id);
+            var angular = Bodies.GetAngularVelocity(id);
+            SourceDragLaw.Apply(ref linear, ref angular, rotation, in basis, stepSeconds);
             Bodies.SetLinearVelocity(in id, in linear);
             Bodies.SetAngularVelocity(in id, in angular);
         }
@@ -238,6 +241,13 @@ public sealed partial class JoltPhysicsHost : IDisposable
         if (motionType == MotionType.Static) staticBodies.Add(id.ID);
         bodySurfaces[id.ID] = surfaceId;
         bodyProfiles[id.ID] = effectiveProfile;
+        if (motionType != MotionType.Static && effectiveProfile.EnableDrag &&
+            (effectiveProfile.DragCoefficientPerSecond != 0f || effectiveProfile.RollingDragCoefficientPerSecond != 0f))
+        {
+            bodyDragBases[id.ID] = SourceDragLaw.CreateBoxBasis(halfExtent, effectiveProfile.MassKg,
+                effectiveProfile.InertiaScale, effectiveProfile.DragCoefficientPerSecond,
+                effectiveProfile.RollingDragCoefficientPerSecond);
+        }
         bodyContents[id.ID] = effectiveProfile.ContentsMask;
         bodyLayers[id.ID] = effectiveLayer;
         bodyRequestedLayers[id.ID] = layer;
@@ -671,6 +681,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         ownedBodies.RemoveAll(candidate => candidate.ID == id.ID);
         bodySurfaces.Remove(id.ID);
         bodyProfiles.Remove(id.ID);
+        bodyDragBases.Remove(id.ID);
         bodyContents.Remove(id.ID);
         perTriangleSurfaceBodies.Remove(id.ID);
         sensorBodies.Remove(id.ID);

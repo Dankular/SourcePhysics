@@ -1537,7 +1537,7 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
-    public void OptInRigidBodyDragUsesExplicitExponentialVelocityLaw()
+    public void OptInRigidBodyDragUsesSourceGeometryVelocityLaw()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
         host.Initialize(1024, 0, 1024, 256);
@@ -1549,11 +1549,14 @@ public sealed class MovementMotorTests
             });
         host.Bodies.SetLinearVelocity(body, Vector3.UnitX);
         host.Bodies.SetAngularVelocity(body, Vector3.UnitY);
+        var expectedLinearVelocity = Vector3.UnitX;
+        var expectedAngularVelocity = Vector3.UnitY;
+        var expectedBasis = SourceDragLaw.CreateBoxBasis(Vector3.One, 1f, 1f, 2f, 3f);
+        SourceDragLaw.Apply(ref expectedLinearVelocity, ref expectedAngularVelocity, Quaternion.Identity,
+            in expectedBasis, host.FixedStepSeconds);
         host.Step();
-        var expectedLinear = MathF.Exp(-2f * host.FixedStepSeconds);
-        var expectedAngular = MathF.Exp(-3f * host.FixedStepSeconds);
-        Assert.InRange(host.Bodies.GetLinearVelocity(body).X, expectedLinear - 0.002f, expectedLinear + 0.002f);
-        Assert.InRange(host.Bodies.GetAngularVelocity(body).Y, expectedAngular - 0.002f, expectedAngular + 0.002f);
+        Assert.InRange(host.Bodies.GetLinearVelocity(body).X, expectedLinearVelocity.X - 0.002f, expectedLinearVelocity.X + 0.002f);
+        Assert.InRange(host.Bodies.GetAngularVelocity(body).Y, expectedAngularVelocity.Y - 0.002f, expectedAngularVelocity.Y + 0.002f);
     }
 
     [Fact]
@@ -2899,6 +2902,27 @@ public sealed class MovementMotorTests
         Assert.Equal(expectedRatio, host.GetBodyBuoyancyRatio(body), 5);
         Assert.Equal(1f, host.GetBodyVolume(body));
         Assert.Equal("crate", host.GetBodyName(body));
+    }
+
+    [Fact]
+    public void SourceDragLawUsesGeometryBasesAndSourceClamp()
+    {
+        var basis = SourceDragLaw.CreateBoxBasis(new Vector3(1f, 2f, 3f), 4f, 1f, 2f, 0.01f);
+        var linear = new Vector3(2f, 0f, 0f);
+        var angular = new Vector3(0f, 2f, 0f);
+        SourceDragLaw.Apply(ref linear, ref angular, Quaternion.Identity, in basis, 0.01f);
+
+        var linearBasisX = (2f * 2f) * (3f * 2f) / 4f;
+        var expectedLinearScale = 1f - 0.5f * 2f * (2f * linearBasisX) * 2f * 0.01f;
+        Assert.Equal(2f * expectedLinearScale, linear.X, 5);
+        Assert.Equal(0f, linear.Y, 5);
+        Assert.Equal(0f, linear.Z, 5);
+        Assert.InRange(angular.Y, 0f, 2f);
+
+        var clamped = new Vector3(1000f, 0f, 0f);
+        var noAngular = Vector3.Zero;
+        SourceDragLaw.Apply(ref clamped, ref noAngular, Quaternion.Identity, in basis, 1f);
+        Assert.Equal(Vector3.Zero, clamped);
     }
 
     [Fact]
