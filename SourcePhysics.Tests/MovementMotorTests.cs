@@ -3008,6 +3008,23 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceSetInertiaUsesAbsoluteDiagonalValues()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize();
+        var body = host.CreateBoxBody(new(0.5f), Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { GravityFactor = 0f });
+
+        host.SetBodyInertia(body, new Vector3(-2f, 3f, -4f));
+
+        Assert.True(host.TryGetBodyInertia(body, out var inertia));
+        Assert.Equal(2f, inertia.X, 4);
+        Assert.Equal(3f, inertia.Y, 4);
+        Assert.Equal(4f, inertia.Z, 4);
+        Assert.Throws<ArgumentOutOfRangeException>(() => host.SetBodyInertia(body, new Vector3(0f, 1f, 1f)));
+    }
+
+    [Fact]
     public void SourceFluidProfileUsesReferencedDefaultTorqueFactor()
     {
         var profile = new SourceFluidProfile();

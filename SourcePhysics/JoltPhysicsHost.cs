@@ -633,6 +633,49 @@ public sealed partial class JoltPhysicsHost : IDisposable
         };
     }
 
+    /// <summary>Applies Source CPhysicsObject::SetInertia in SI inertia units.</summary>
+    public void SetBodyInertia(BodyID bodyId, Vector3 inertiaKgMetersSquared)
+    {
+        EnsureDynamicBody(bodyId);
+        if (!float.IsFinite(inertiaKgMetersSquared.X) || !float.IsFinite(inertiaKgMetersSquared.Y) ||
+            !float.IsFinite(inertiaKgMetersSquared.Z) || inertiaKgMetersSquared.X == 0f ||
+            inertiaKgMetersSquared.Y == 0f || inertiaKgMetersSquared.Z == 0f)
+            throw new ArgumentOutOfRangeException(nameof(inertiaKgMetersSquared));
+        var inertia = Vector3.Abs(inertiaKgMetersSquared);
+        var inverseInertia = new Vector3(1f / inertia.X, 1f / inertia.Y, 1f / inertia.Z);
+        var lockInterface = System.BodyLockInterfaceNoLock;
+        lockInterface.LockWrite(in bodyId, out var lockWrite);
+        if (!lockWrite.Succeeded || lockWrite.Body is null)
+            throw new InvalidOperationException("Jolt could not lock the body for inertia mutation.");
+        try
+        {
+            var motionProperties = lockWrite.Body.MotionProperties;
+            motionProperties.SetInverseInertia(in inverseInertia, Quaternion.Identity);
+        }
+        finally
+        {
+            lockInterface.UnlockWrite(in lockWrite);
+        }
+    }
+
+    public bool TryGetBodyInertia(BodyID bodyId, out Vector3 inertiaKgMetersSquared)
+    {
+        inertiaKgMetersSquared = default;
+        if (!bodyId.IsValid || !Bodies.IsAdded(bodyId) || Bodies.GetMotionType(bodyId) != MotionType.Dynamic)
+            return false;
+        var lockInterface = System.BodyLockInterfaceNoLock;
+        lockInterface.LockRead(in bodyId, out var lockRead);
+        if (!lockRead.Succeeded || lockRead.Body is null)
+            return false;
+        var inverseInertia = lockRead.Body.MotionProperties.InverseInertiaDiagonal;
+        lockInterface.UnlockRead(in lockRead);
+        if (!float.IsFinite(inverseInertia.X) || !float.IsFinite(inverseInertia.Y) ||
+            !float.IsFinite(inverseInertia.Z) || inverseInertia.X <= 0f || inverseInertia.Y <= 0f || inverseInertia.Z <= 0f)
+            return false;
+        inertiaKgMetersSquared = new Vector3(1f / inverseInertia.X, 1f / inverseInertia.Y, 1f / inverseInertia.Z);
+        return true;
+    }
+
     public void MoveKinematic(BodyID bodyId, Vector3 targetPosition, Quaternion targetRotation, float deltaSeconds)
     {
         if (!initialized || !bodyId.IsValid || !Bodies.IsAdded(bodyId))
