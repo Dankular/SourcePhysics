@@ -163,6 +163,7 @@ public sealed record SourceVehicleProfile
 
     public void Validate()
     {
+        if (!Enum.IsDefined(Type)) throw new InvalidDataException("Vehicle type is not defined by the Source contract.");
         if (AxleCount is < 1 or > 4) throw new InvalidDataException("Vehicle axle count must be 1..4.");
         if (WheelsPerAxle is < 1 or > 2) throw new InvalidDataException("Vehicle wheels per axle must be 1..2.");
         if (Axles.Count != AxleCount) throw new InvalidDataException("Vehicle axle data does not match axle count.");
@@ -183,6 +184,8 @@ public sealed record SourceVehicleProfile
         };
         if (bodyScalars.Any(value => !float.IsFinite(value)))
             throw new InvalidDataException("Vehicle body values must be finite.");
+        RequireNonNegative(Body.MassOverrideKilograms, "vehicle mass override");
+        RequireNonNegative(Body.MaxAngularVelocityRadiansPerSecond, "vehicle maximum angular velocity");
         ValidateVector(Body.MassCenterOverrideSourceUnits, "vehicle mass-center override");
 
         var engineScalars = new[]
@@ -194,6 +197,20 @@ public sealed record SourceVehicleProfile
         };
         if (engineScalars.Any(value => !float.IsFinite(value)))
             throw new InvalidDataException("Vehicle engine values must be finite.");
+        RequireNonNegative(Engine.Horsepower, "vehicle horsepower");
+        RequireNonNegative(Engine.MaxSpeedMilesPerHour, "vehicle maximum speed");
+        RequireNonNegative(Engine.MaxReverseSpeedMilesPerHour, "vehicle maximum reverse speed");
+        RequireNonNegative(Engine.MaxRpm, "vehicle maximum RPM");
+        RequireNonNegative(Engine.AxleRatio, "vehicle axle ratio");
+        RequireNonNegative(Engine.ThrottleTimeSeconds, "vehicle throttle time");
+        RequireNonNegative(Engine.ShiftUpRpm, "vehicle shift-up RPM");
+        RequireNonNegative(Engine.ShiftDownRpm, "vehicle shift-down RPM");
+        RequireNonNegative(Engine.BoostForce, "vehicle boost force");
+        RequireNonNegative(Engine.BoostDurationSeconds, "vehicle boost duration");
+        RequireNonNegative(Engine.BoostDelaySeconds, "vehicle boost delay");
+        RequireNonNegative(Engine.BoostMaxSpeedMilesPerHour, "vehicle boost maximum speed");
+        RequireNonNegative(Engine.AutoBrakeSpeedGain, "vehicle auto-brake speed gain");
+        RequireNonNegative(Engine.AutoBrakeSpeedFactor, "vehicle auto-brake speed factor");
 
         var steeringScalars = new[]
         {
@@ -208,6 +225,8 @@ public sealed record SourceVehicleProfile
         };
         if (steeringScalars.Any(value => !float.IsFinite(value)))
             throw new InvalidDataException("Vehicle steering values must be finite.");
+        foreach (var value in steeringScalars)
+            RequireNonNegative(value, "vehicle steering parameter");
 
         foreach (var axle in Axles)
         {
@@ -223,6 +242,12 @@ public sealed record SourceVehicleProfile
             };
             if (wheelScalars.Any(value => !float.IsFinite(value)))
                 throw new InvalidDataException("Vehicle wheel values must be finite.");
+            RequireNonNegative(wheel.MassKilograms, "vehicle wheel mass");
+            RequireNonNegative(wheel.Inertia, "vehicle wheel inertia");
+            RequireNonNegative(wheel.Damping, "vehicle wheel damping");
+            RequireNonNegative(wheel.RotationalDamping, "vehicle wheel rotational damping");
+            RequireNonNegative(wheel.FrictionScale, "vehicle wheel friction scale");
+            RequireNonNegative(wheel.SpringAdditionalLengthSourceUnits, "vehicle spring additional length");
             var suspensionScalars = new[]
             {
                 axle.Suspension.SpringConstant, axle.Suspension.SpringDamping,
@@ -231,7 +256,19 @@ public sealed record SourceVehicleProfile
             };
             if (suspensionScalars.Any(value => !float.IsFinite(value)))
                 throw new InvalidDataException("Vehicle suspension and axle values must be finite.");
+            RequireNonNegative(axle.Suspension.SpringConstant, "vehicle spring constant");
+            RequireNonNegative(axle.Suspension.SpringDamping, "vehicle spring damping");
+            RequireNonNegative(axle.Suspension.StabilizerConstant, "vehicle stabilizer constant");
+            RequireNonNegative(axle.Suspension.SpringDampingCompression, "vehicle compression damping");
+            RequireNonNegative(axle.Suspension.MaxBodyForce, "vehicle maximum body force");
+            RequireNonNegative(axle.TorqueFactor, "vehicle torque factor");
+            RequireNonNegative(axle.BrakeFactor, "vehicle brake factor");
         }
+    }
+
+    private static void RequireNonNegative(float value, string name)
+    {
+        if (value < 0f) throw new InvalidDataException($"{name} cannot be negative.");
     }
 
     private static void ValidateVector(Vector3 value, string name)

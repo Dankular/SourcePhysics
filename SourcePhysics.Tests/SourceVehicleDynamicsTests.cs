@@ -219,6 +219,29 @@ public sealed class SourceVehicleDynamicsTests
         Assert.True(comparison.NumericMaximum > 0.9f);
     }
 
+    [Fact]
+    public void VehicleProfileRejectsNegativePhysicalParameters()
+    {
+        Assert.Throws<InvalidDataException>(() => (Profile() with
+        {
+            Engine = new SourceVehicleEngineProfile { Horsepower = -1f }
+        }).Validate());
+        Assert.Throws<InvalidDataException>(() => (Profile() with
+        {
+            Axles = new[]
+            {
+                new SourceVehicleAxleProfile
+                {
+                    Wheels = new SourceVehicleWheelProfile { RadiusSourceUnits = 10f, MassKilograms = -1f }
+                }
+            }
+        }).Validate());
+        Assert.Throws<InvalidDataException>(() => (Profile() with
+        {
+            Steering = new SourceVehicleSteeringProfile { SteeringExponent = -1f }
+        }).Validate());
+    }
+
     private static SourceVehicleProfile Profile() => new()
     {
         AxleCount = 1,
