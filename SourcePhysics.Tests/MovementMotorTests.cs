@@ -554,6 +554,21 @@ public sealed class MovementMotorTests
         Assert.False(comparison.Passes(0.001f, 0.001f, 0.001f, 0.001f));
         Assert.Contains(comparison.Errors, error => error.Contains("position:"));
 
+        var alteredProperties = artifact with
+        {
+            Frames = new List<SourcePhysicsTickFrame>
+            {
+                frame with
+                {
+                    Properties = frame.Properties!.Select(properties => properties.BodyId == body.ID
+                        ? properties with { MassKg = properties.MassKg + 1f }
+                        : properties).ToArray()
+                }
+            }
+        };
+        var propertyComparison = SourcePhysicsRecordingComparator.Compare(artifact, alteredProperties);
+        Assert.Contains("properties:12", propertyComparison.Errors);
+
         host.Step();
         recording.Capture(13);
         var withContacts = SourcePhysicsRecordingArtifact.FromJson(recording.ToJson());
