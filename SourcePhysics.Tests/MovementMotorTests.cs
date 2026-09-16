@@ -2924,6 +2924,25 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceAirboatUprightControllersMatchContactWeakJumpAndRollGates()
+    {
+        var pitch = SourceVehicleDynamics.ComputeAirboatUprightImpulse(
+            new(0f, -1f, 0f), false, false, false, 0f, 0.1f, 10f);
+        Assert.True(pitch.AngularImpulse.Length() > 0f);
+        Assert.Equal(SourceVehicleDynamics.AirboatUprightReferenceAngleRadians,
+            pitch.Error, 4);
+
+        var weak = SourceVehicleDynamics.ComputeAirboatUprightImpulse(
+            new(0f, -1f, 0f), false, true, false, 0.25f, 0.1f, 10f);
+        Assert.Equal(Vector3.Zero, weak.AngularImpulse);
+        Assert.Equal(0.25f, weak.Error);
+
+        var contacted = SourceVehicleDynamics.ComputeAirboatUprightImpulse(
+            new(0f, -1f, 0f), true, false, true, 0.25f, 0.1f, 10f);
+        Assert.Equal(Vector3.Zero, contacted.AngularImpulse);
+    }
+
+    [Fact]
     public void SourcePushawayPolicyMatchesSourceForceClampAndSpeedGate()
     {
         var profile = new SourcePushawayProfile();

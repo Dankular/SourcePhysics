@@ -27,6 +27,7 @@ public static class SourceVehicleDynamics
     public const float AirboatSteeringInterval = 0.5f;
     public const float AirboatRotationalDrag = 0.00004f;
     public const float AirboatRotationalDamping = 0.001f;
+    public const float AirboatUprightReferenceAngleRadians = 0.17453292f;
     public const float MilesPerHourToMetersPerSecond = 0.44707f;
     public const float WattsPerHorsepower = 745f;
     public const float SecondsPerMinute = 60f;
@@ -38,6 +39,7 @@ public static class SourceVehicleDynamics
         float RearAccelerationSourceUnitsPerSecondSquared);
     public readonly record struct AirboatSteeringResult(Vector3 RotationalImpulse,
         bool SteeringReversed, float SteerTime, float PreviousSteeringAngle);
+    public readonly record struct AirboatUprightResult(Vector3 AngularImpulse, float Error);
 
     /// Exact control preprocessing performed by CVehicleController::Update
     /// before steering, engine, handbrake and skid dispatch. Physics-system
@@ -409,6 +411,52 @@ public static class SourceVehicleDynamics
             steerTime, steeringAngle * (steeringReversed ? -1f : 1f));
     }
 
+    /// Shared core-space implementation of Source's
+    /// DoSimulationKeepUprightPitch/DoSimulationKeepUprightRoll controllers.
+    /// `goalAxisCore` is the world-down axis transformed into core space.
+    public static AirboatUprightResult ComputeAirboatUprightImpulse(
+        Vector3 goalAxisCore, bool rollController, bool weakJump,
+        bool hasSurfaceContact, float previousError, float deltaSeconds,
+        float bodyMassKg)
+    {
+        if (!IsFinite(goalAxisCore) || !float.IsFinite(previousError) ||
+            !float.IsFinite(deltaSeconds) || !float.IsFinite(bodyMassKg))
+            throw new ArgumentOutOfRangeException(nameof(goalAxisCore));
+        if (goalAxisCore.LengthSquared() < 1e-12f)
+            throw new ArgumentOutOfRangeException(nameof(goalAxisCore));
+        if (deltaSeconds < 0f || bodyMassKg < 0f)
+            throw new ArgumentOutOfRangeException(nameof(deltaSeconds));
+        if (!rollController && weakJump)
+            return new(Vector3.Zero, previousError);
+
+        var reference = new Vector3(0f,
+            -MathF.Cos(AirboatUprightReferenceAngleRadians),
+            MathF.Sin(AirboatUprightReferenceAngleRadians));
+        var goal = Vector3.Normalize(goalAxisCore);
+        if (rollController) goal.Y = reference.Y;
+        else goal.X = reference.X;
+        goal = Vector3.Normalize(goal);
+
+        var rotationAxis = Vector3.Cross(reference, goal);
+        var sine = rotationAxis.Length();
+        if (sine > 1e-12f) rotationAxis /= sine;
+        var angle = MathF.Atan2(sine, Vector3.Dot(reference, goal));
+        if (hasSurfaceContact || (rollController && MathF.Abs(angle) <
+            MathF.PI / 18f))
+            return new(Vector3.Zero, angle);
+
+        var impulseMagnitude = bodyMassKg * (rollController
+            ? 0.2f * angle + 0.3f * deltaSeconds * (angle - previousError)
+            : 0.1f * angle + 0.04f * deltaSeconds * (angle - previousError));
+        var impulse = rotationAxis * impulseMagnitude;
+        var maximum = bodyMassKg * (rollController
+            ? 2f * MathF.PI / 180f
+            : 1.5f * MathF.PI / 180f);
+        var length = impulse.Length();
+        if (length > maximum && length > 1e-12f) impulse *= maximum / length;
+        return new(impulse, angle);
+    }
+
     private static void ValidateAirboatDragInputs(Vector3 localVelocity,
         float speedMetersPerSecond, float bodyMassKg, float deltaSeconds)
     {
@@ -422,6 +470,9 @@ public static class SourceVehicleDynamics
         if (!float.IsFinite(deltaSeconds) || deltaSeconds < 0f)
             throw new ArgumentOutOfRangeException(nameof(deltaSeconds));
     }
+
+    private static bool IsFinite(Vector3 value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
 
     public static float SourceUnitsPerSecondToMilesPerHour(float sourceUnitsPerSecond) =>
         SourceUnits.ToMeters(sourceUnitsPerSecond) / MilesPerHourToMetersPerSecond;
