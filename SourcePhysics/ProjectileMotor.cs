@@ -70,7 +70,7 @@ public sealed class SourceProjectileMotor
             : State.PenetrationPowerRemaining;
         if (availablePenetrationPower > 0f && State.Penetrations < profile.MaximumPenetrations &&
             queries is IProjectilePenetrationQueries penetrator &&
-            penetrator.TryPenetrate(State.Position, in hit, velocity, availablePenetrationPower,
+            penetrator.TryPenetrate(hit.Position, in hit, velocity, availablePenetrationPower,
                 out var exitPosition, out var exitVelocity, out var consumedPower))
         {
             var remainingPower = MathF.Max(0f, availablePenetrationPower - consumedPower);

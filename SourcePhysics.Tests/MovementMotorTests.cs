@@ -2010,16 +2010,18 @@ public sealed class MovementMotorTests
     [Fact]
     public void ProjectilePenetrationUsesExplicitQueryAndTracksBudget()
     {
+        var queries = new PenetratingProjectileQueries();
         var projectile = new SourceProjectileMotor(new SourceProjectileProfile
         {
             GravityScale = 0f, PenetrationPower = 10f, MaximumPenetrations = 1
-        }, new PenetratingProjectileQueries(), Vector3.Zero, Vector3.UnitX);
+        }, queries, Vector3.Zero, Vector3.UnitX);
         var hit = projectile.Tick(0.1f);
         Assert.True(hit.HasValue);
         Assert.Equal(1, projectile.State.Penetrations);
         Assert.True(projectile.State.Active);
         Assert.Equal(new Vector3(2, 0, 0), projectile.State.Position);
         Assert.Equal(8f, projectile.State.PenetrationPowerRemaining);
+        Assert.Equal(new Vector3(0.5f, 0f, 0f), queries.EntryPosition);
     }
 
     [Fact]
@@ -2979,6 +2981,8 @@ public sealed class MovementMotorTests
 
     private sealed class PenetratingProjectileQueries : IProjectileQueries, IProjectilePenetrationQueries
     {
+        public Vector3 EntryPosition { get; private set; }
+
         public bool Sweep(Vector3 start, Vector3 end, out ProjectileHit hit)
         {
             hit = new(new(0.5f, 0, 0), -Vector3.UnitX, 5, 0f, ThicknessInches: 1f);
@@ -2988,6 +2992,7 @@ public sealed class MovementMotorTests
         public bool TryPenetrate(Vector3 entryPosition, in ProjectileHit entryHit, Vector3 incomingVelocity,
             float availablePower, out Vector3 exitPosition, out Vector3 exitVelocity, out float consumedPower)
         {
+            EntryPosition = entryPosition;
             exitPosition = new(2, 0, 0);
             exitVelocity = incomingVelocity;
             consumedPower = 2f;
