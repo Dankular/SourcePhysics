@@ -23,13 +23,23 @@ public sealed class SourceConstraintContractTests
             MotorTargetVelocity = 3f,
             MotorMaximumForce = 10f,
             BreakForce = 20f,
-            BreakTorque = 30f
+            BreakTorque = 30f,
+            BreakStrength = 0.75f,
+            BodyMassScaleA = 0.5f,
+            BodyMassScaleB = 2f,
+            AdditionalIterations = 2,
+            MinimumErrorTicks = 15,
+            ErrorToleranceSourceUnits = 3f,
+            AxisAngularVelocity = 4f,
+            AxisTorque = 8f
         };
 
         profile.Validate();
         Assert.Equal(SourceConstraintType.Hinge, profile.Type);
         Assert.Equal(4, profile.ConstraintGroup);
         Assert.Equal(2f, profile.MaximumLimit);
+        Assert.Equal(0.75f, profile.BreakStrength);
+        Assert.Equal(2, profile.AdditionalIterations);
     }
 
     [Fact]
@@ -46,6 +56,18 @@ public sealed class SourceConstraintContractTests
         Assert.Throws<InvalidDataException>(() => new SourceConstraintProfile
         {
             BreakTorque = -1f
+        }.Validate());
+        Assert.Throws<InvalidDataException>(() => new SourceConstraintProfile
+        {
+            BreakStrength = 2f
+        }.Validate());
+        Assert.Throws<InvalidDataException>(() => new SourceConstraintProfile
+        {
+            Type = SourceConstraintType.Ragdoll
+        }.Validate());
+        Assert.Throws<InvalidDataException>(() => new SourceConstraintProfile
+        {
+            RagdollAxes = new[] { new SourceConstraintAxisLimit { MinimumRotation = 1f, MaximumRotation = 0f } }
         }.Validate());
     }
 

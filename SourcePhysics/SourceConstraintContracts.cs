@@ -13,6 +13,22 @@ public enum SourceConstraintType
     Ragdoll
 }
 
+public sealed record SourceConstraintAxisLimit
+{
+    public float MinimumRotation { get; init; }
+    public float MaximumRotation { get; init; }
+    public float AngularVelocity { get; init; }
+    public float Torque { get; init; }
+
+    public void Validate()
+    {
+        if (!float.IsFinite(MinimumRotation) || !float.IsFinite(MaximumRotation) ||
+            !float.IsFinite(AngularVelocity) || !float.IsFinite(Torque) ||
+            MinimumRotation > MaximumRotation || Torque < 0f)
+            throw new InvalidDataException("Constraint axis limit is invalid.");
+    }
+}
+
 /// Source/Havok constraint asset data. This is deliberately a data contract;
 /// runtime creation is kept separate until the installed Jolt binding's
 /// add/remove/dispose lifecycle is proven safe.
@@ -32,9 +48,26 @@ public sealed record SourceConstraintProfile
     public float MotorMaximumForce { get; init; }
     public float BreakForce { get; init; }
     public float BreakTorque { get; init; }
+    /// Source constraint_breakableparams_t fields.
+    public float BreakStrength { get; init; } = 1f;
+    public float BodyMassScaleA { get; init; } = 1f;
+    public float BodyMassScaleB { get; init; } = 1f;
+    public bool IsActive { get; init; } = true;
+    /// Source constraint_groupparams_t fields.
+    public int AdditionalIterations { get; init; }
+    public int MinimumErrorTicks { get; init; } = 15;
+    public float ErrorToleranceSourceUnits { get; init; } = 3f;
+    /// Hinge/slider axis policy, and the three Source ragdoll axes.
+    public float AxisAngularVelocity { get; init; }
+    public float AxisTorque { get; init; }
+    public bool OnlyAngularLimits { get; init; }
+    public bool UseClockwiseRotations { get; init; }
+    public IReadOnlyList<SourceConstraintAxisLimit> RagdollAxes { get; init; } = Array.Empty<SourceConstraintAxisLimit>();
 
     public void Validate()
     {
+        if (!Enum.IsDefined(Type))
+            throw new InvalidDataException("Constraint type is not defined by the Source contract.");
         ValidateVector(LocalAnchorA, "constraint anchor A");
         ValidateVector(LocalAnchorB, "constraint anchor B");
         ValidateVector(LocalAxisA, "constraint axis A");
@@ -48,6 +81,21 @@ public sealed record SourceConstraintProfile
             throw new InvalidDataException("Constraint motor and break values must be finite.");
         if (MotorMaximumForce < 0f || BreakForce < 0f || BreakTorque < 0f)
             throw new InvalidDataException("Constraint motor and break values cannot be negative.");
+        if (!float.IsFinite(BreakStrength) || BreakStrength < 0f || BreakStrength > 1f ||
+            !float.IsFinite(BodyMassScaleA) || !float.IsFinite(BodyMassScaleB) ||
+            BodyMassScaleA < 0f || BodyMassScaleB < 0f)
+            throw new InvalidDataException("Constraint breakable parameters are invalid.");
+        if (AdditionalIterations < 0 || MinimumErrorTicks < 0 ||
+            !float.IsFinite(ErrorToleranceSourceUnits) || ErrorToleranceSourceUnits < 0f ||
+            !float.IsFinite(AxisAngularVelocity) || !float.IsFinite(AxisTorque) || AxisTorque < 0f)
+            throw new InvalidDataException("Constraint group or axis parameters are invalid.");
+        if (Type == SourceConstraintType.Ragdoll && RagdollAxes.Count != 3)
+            throw new InvalidDataException("Source ragdoll constraints require three axis limits.");
+        foreach (var axis in RagdollAxes)
+        {
+            ArgumentNullException.ThrowIfNull(axis);
+            axis.Validate();
+        }
     }
 
     private static void ValidateVector(Vector3 value, string name)
