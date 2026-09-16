@@ -12,7 +12,11 @@ public sealed record SourceFluidProfile
     public Vector3 CurrentVelocitySourceUnitsPerSecond { get; init; }
     public float DensityKgPerM3 { get; init; }
     public float Damping { get; init; }
-    public float TorqueFactor { get; init; }
+    /// Source physics_fluid.cpp initializes IVP_Template_Buoyancy torque_factor
+    /// to 0.01 when the fluid params do not override it.
+    public float TorqueFactor { get; init; } = 0.01f;
+    /// Source initializes viscosity_factor to zero; the separate IVP
+    /// viscosity_input_factor is not silently folded into this Jolt parameter.
     public float ViscosityFactor { get; init; }
     public SourceContents Contents { get; init; } = SourceContents.Water;
     public float? BuoyancyForceNewtons { get; init; }

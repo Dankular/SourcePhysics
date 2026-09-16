@@ -2795,6 +2795,15 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceFluidProfileUsesReferencedDefaultTorqueFactor()
+    {
+        var profile = new SourceFluidProfile();
+
+        Assert.Equal(0.01f, profile.TorqueFactor);
+        Assert.Equal(0f, profile.ViscosityFactor);
+    }
+
+    [Fact]
     public void SourceFluidSurfacePlaneFollowsFluidObjectTransform()
     {
         var rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI * 0.5f);
