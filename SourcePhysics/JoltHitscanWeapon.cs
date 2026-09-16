@@ -133,6 +133,9 @@ public sealed class JoltHitscanWeapon : SyncScript
             throw new ArgumentOutOfRangeException(nameof(info), "Distance must be finite and positive.");
         if (info.TracerFrequency < 0)
             throw new ArgumentOutOfRangeException(nameof(info), "Tracer frequency cannot be negative.");
+        if (info.AdditionalIgnoreBodyId < -1 || info.InflictorBodyId < -1 ||
+            info.AttackerBodyId < -1 || info.WeaponBodyId < -1)
+            throw new ArgumentOutOfRangeException(nameof(info), "Source body identities must be -1 or non-negative.");
         if (!float.IsFinite(info.Damage) || info.Damage < 0f || info.PlayerDamage < 0)
             throw new ArgumentOutOfRangeException(nameof(info), "Damage must be non-negative and finite.");
         if (!float.IsFinite(info.DamageForceScale) || info.DamageForceScale < 0f)

@@ -201,6 +201,9 @@ public sealed class MovementMotorTests
         Assert.Throws<ArgumentOutOfRangeException>(() => weapon.FireBullets(
             new SourceFireBulletsInfo(1, Vector3.Zero, Vector3.UnitX, Vector3.Zero,
                 10f, 0, TracerFrequency: -1), 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => weapon.FireBullets(
+            new SourceFireBulletsInfo(1, Vector3.Zero, Vector3.UnitX, Vector3.Zero,
+                10f, 0, AttackerBodyId: -2), 1));
     }
 
     [Fact]
