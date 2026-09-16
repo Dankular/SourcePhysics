@@ -224,8 +224,12 @@ public sealed class JoltHitscanWeapon : SyncScript
             if (!suppressDamage && DamageTargetResolver?.Invoke(result.HitData) is { } target)
             {
                 var hitData = result.HitData;
+                var inflictorId = info.InflictorBodyId >= 0 ? info.InflictorBodyId : -1;
+                var attackerId = info.AttackerBodyId >= 0 ? info.AttackerBodyId : ShooterBodyId;
+                var weaponId = info.WeaponBodyId >= 0 ? info.WeaponBodyId : -1;
                 var damageInfo = new SourceDamageInfo(damage, damage, damageForce, result.HitData.Position,
-                    info.OriginMeters, actualDamageType, info.AmmoType);
+                    info.OriginMeters, actualDamageType, info.AmmoType,
+                    InflictorBodyId: inflictorId, AttackerBodyId: attackerId, WeaponBodyId: weaponId);
                 var targetId = DamageTargetIdResolver?.Invoke(result.HitData) ?? result.HitData.BodyId;
                 multiDamage.DispatchTraceAttack(targetId, target, in damageInfo,
                     result.Direction, in hitData);

@@ -25,7 +25,10 @@ public readonly record struct WeaponShotFrame(
     Vector3 DamageForce = default,
     Vector3 TracerDestination = default,
     SourceShotTraceShape TraceShape = SourceShotTraceShape.Ray,
-    int AdditionalIgnoreBodyId = -1);
+    int AdditionalIgnoreBodyId = -1,
+    int InflictorBodyId = -1,
+    int AttackerBodyId = -1,
+    int WeaponBodyId = -1);
 
 public sealed class WeaponRecording
 {
@@ -47,7 +50,8 @@ public sealed class WeaponRecording
             impact?.HitWater ?? false, impact?.SuppressSurfaceImpact ?? false,
             impact?.DamageSuppressed ?? false, impact?.DamageForce ?? default,
             impact?.TracerDestination ?? (hit ? hitData.Position : origin + direction * info.DistanceMeters),
-            traceShape, info.AdditionalIgnoreBodyId));
+            traceShape, info.AdditionalIgnoreBodyId, info.InflictorBodyId,
+            info.AttackerBodyId, info.WeaponBodyId));
     }
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
@@ -111,6 +115,12 @@ public static class WeaponParityComparator
             if (left.TraceShape != right.TraceShape) errors.Add(new(left.Tick, left.ShotIndex, "trace-shape"));
             if (left.AdditionalIgnoreBodyId != right.AdditionalIgnoreBodyId)
                 errors.Add(new(left.Tick, left.ShotIndex, "additional-ignore-body"));
+            if (left.InflictorBodyId != right.InflictorBodyId)
+                errors.Add(new(left.Tick, left.ShotIndex, "inflictor-body"));
+            if (left.AttackerBodyId != right.AttackerBodyId)
+                errors.Add(new(left.Tick, left.ShotIndex, "attacker-body"));
+            if (left.WeaponBodyId != right.WeaponBodyId)
+                errors.Add(new(left.Tick, left.ShotIndex, "weapon-body"));
 
             var directionError = Vector3.Distance(left.Direction, right.Direction);
             directionSum += directionError * directionError;

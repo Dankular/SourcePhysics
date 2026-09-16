@@ -14,7 +14,10 @@ public readonly record struct SourceDamageInfo(
     int DamageType,
     int AmmoType,
     int DamageCustom = 0,
-    int PlayerPenetrationCount = 0);
+    int PlayerPenetrationCount = 0,
+    int InflictorBodyId = -1,
+    int AttackerBodyId = -1,
+    int WeaponBodyId = -1);
 
 public interface ISourceDamageTarget
 {
@@ -77,7 +80,10 @@ public sealed class SourceMultiDamageAccumulator
             DamageCustom = info.DamageCustom,
             PlayerPenetrationCount = accumulated.PlayerPenetrationCount == 0
                 ? info.PlayerPenetrationCount
-                : accumulated.PlayerPenetrationCount
+                : accumulated.PlayerPenetrationCount,
+            InflictorBodyId = accumulated.InflictorBodyId,
+            AttackerBodyId = accumulated.AttackerBodyId,
+            WeaponBodyId = accumulated.WeaponBodyId
         };
     }
 
@@ -103,7 +109,8 @@ public sealed class SourceMultiDamageAccumulator
         if (!float.IsFinite(info.Damage) || info.Damage < 0f ||
             !float.IsFinite(info.MaxDamage) || info.MaxDamage < 0f ||
             !IsFinite(info.DamageForce) || !IsFinite(info.DamagePosition) ||
-            !IsFinite(info.ReportedPosition) || info.PlayerPenetrationCount < 0)
+            !IsFinite(info.ReportedPosition) || info.PlayerPenetrationCount < 0 ||
+            info.InflictorBodyId < -1 || info.AttackerBodyId < -1 || info.WeaponBodyId < -1)
             throw new InvalidOperationException($"{operation} returned invalid damage data.");
     }
 

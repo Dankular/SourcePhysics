@@ -1040,7 +1040,8 @@ public sealed class MovementMotorTests
 
         var info = new SourceFireBulletsInfo(2, Vector3.Zero, Vector3.UnitZ, Vector3.Zero, 10f, 3,
             Damage: 12f, PlayerDamage: 25, Flags: SourceFireBulletsFlags.FirstShotAccurate,
-            DamageForceScale: 0.5f, DamageType: 0x1234);
+            DamageForceScale: 0.5f, DamageType: 0x1234, InflictorBodyId: 101,
+            AttackerBodyId: 202, WeaponBodyId: 303);
         var results = weapon.FireBullets(in info, 47);
 
         Assert.Equal(2, results.Count);
@@ -1065,6 +1066,10 @@ public sealed class MovementMotorTests
         Assert.Equal(50f, damageTarget.LastDamage.Damage);
         Assert.Equal(new Vector3(0f, 0f, 100f), damageTarget.LastDamage.DamageForce);
         Assert.Equal(0x3234, damageTarget.LastDamage.DamageType);
+        Assert.Equal(101, damageTarget.LastDamage.InflictorBodyId);
+        Assert.Equal(202, damageTarget.LastDamage.AttackerBodyId);
+        Assert.Equal(303, damageTarget.LastDamage.WeaponBodyId);
+        Assert.Equal(202, recording.Frames[0].AttackerBodyId);
     }
 
     [Fact]
