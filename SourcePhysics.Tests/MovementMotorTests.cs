@@ -2699,7 +2699,10 @@ public sealed class MovementMotorTests
         var scaled = host.CreateBoxBody(new(0.25f), Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
             SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { BuoyancyRatio = 0.35f });
         var disabled = host.CreateBoxBody(new(0.25f), Vector3.UnitX, JoltPhysicsSharp.MotionType.Dynamic,
-            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { FluidSimulationEnabled = false });
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                CallbackFlags = SourceCallbackFlags.Default & ~SourceCallbackFlags.DoFluidSimulation
+            });
 
         Assert.Equal(0.35f, host.GetBodyBuoyancyRatio(scaled));
         Assert.True(host.IsFluidSimulationEnabled(scaled));
