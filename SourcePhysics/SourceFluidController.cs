@@ -98,6 +98,25 @@ public sealed class JoltFluidController : IDisposable
     public float GetDensity(BodyID fluidBody) => GetFluid(fluidBody).DensityKgPerM3;
     public ulong GetGameData(BodyID fluidBody) => GetFluid(fluidBody).GameData;
 
+    public SourceFluidSurfaceState GetSurfacePlane(BodyID fluidBody)
+    {
+        if (!localSurfaces.TryGetValue(fluidBody.ID, out var localSurface) ||
+            !host.Bodies.IsAdded(fluidBody))
+            throw new ArgumentException("Fluid body is not registered.", nameof(fluidBody));
+        GetBodyPose(fluidBody, out var origin, out var rotation);
+        return SourceFluidSurfaceMath.ToWorld(localSurface, origin, rotation);
+    }
+
+    public void WakeAllSleepingObjects(BodyID fluidBody)
+    {
+        GetFluid(fluidBody);
+        foreach (var key in active.Keys.Where(key => key.Fluid == fluidBody.ID).ToArray())
+        {
+            var bodyId = new BodyID(key.Body);
+            if (host.Bodies.IsAdded(bodyId)) host.ActivateBody(bodyId);
+        }
+    }
+
     public void SetGameData(BodyID fluidBody, ulong gameData)
     {
         if (!fluids.TryGetValue(fluidBody.ID, out var profile))

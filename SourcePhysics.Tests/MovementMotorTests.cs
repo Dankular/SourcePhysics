@@ -2856,9 +2856,16 @@ public sealed class MovementMotorTests
         Assert.Equal((ulong)7, controller.GetGameData(fluid));
         controller.SetGameData(fluid, 8);
         Assert.Equal((ulong)8, controller.GetGameData(fluid));
+        var surface = controller.GetSurfacePlane(fluid);
+        Assert.Equal(Vector3.UnitY, surface.Normal);
+        Assert.Equal(0f, surface.Distance);
 
         host.Step();
         Assert.True(controller.ActiveContactCount > 0);
+        host.DeactivateBody(body);
+        Assert.False(host.Bodies.IsActive(body));
+        controller.WakeAllSleepingObjects(fluid);
+        Assert.True(host.Bodies.IsActive(body));
 
         JoltPhysicsSharp.RVector3 outside = new(100f, 100f, 100f);
         host.Bodies.SetRPosition(in body, in outside, JoltPhysicsSharp.Activation.Activate);
