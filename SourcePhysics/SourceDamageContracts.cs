@@ -74,6 +74,7 @@ public sealed class SourceMultiDamageAccumulator
             ReportedPosition = info.ReportedPosition,
             DamageType = accumulated.DamageType | info.DamageType,
             AmmoType = info.AmmoType,
+            DamageCustom = info.DamageCustom,
             PlayerPenetrationCount = accumulated.PlayerPenetrationCount == 0
                 ? info.PlayerPenetrationCount
                 : accumulated.PlayerPenetrationCount
