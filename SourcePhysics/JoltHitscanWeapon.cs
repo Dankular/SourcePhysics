@@ -341,7 +341,8 @@ public sealed class JoltHitscanWeapon : SyncScript
         var damageForce = Vector3.Normalize(info.Direction) * bulletForce * PhysicsPushScale * info.DamageForceScale;
         var damageInfo = new SourceDamageInfo(info.Damage, info.Damage, damageForce,
             solidHit.Position, Vector3.Zero, damageType, info.AmmoType,
-            InflictorBodyId: info.InflictorBodyId, AttackerBodyId: info.AttackerBodyId,
+            InflictorBodyId: info.InflictorBodyId >= 0 ? info.InflictorBodyId : ShooterBodyId,
+            AttackerBodyId: info.AttackerBodyId >= 0 ? info.AttackerBodyId : ShooterBodyId,
             WeaponBodyId: info.WeaponBodyId);
         var targetId = DamageTargetIdResolver?.Invoke(trigger) ?? trigger.BodyId;
         var accumulator = new SourceMultiDamageAccumulator();
