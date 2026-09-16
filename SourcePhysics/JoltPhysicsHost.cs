@@ -196,7 +196,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
     {
         if (!initialized) throw new InvalidOperationException("Initialize the Jolt host before creating bodies.");
         profile.Validate();
-        var effectiveProfile = ApplySourceVolumeBuoyancy(profile, surfaceId);
+        var effectiveProfile = ApplySourceVolumeBuoyancy(ApplySourceMassLimits(profile), surfaceId);
         using var boxShape = new BoxShape(halfExtent, 0.001f);
         OffsetCenterOfMassShape? offsetShape = null;
         Shape shape = boxShape;
@@ -229,7 +229,10 @@ public sealed partial class JoltPhysicsHost : IDisposable
             OverrideMassProperties = OverrideMassProperties.MassAndInertiaProvided
         };
         var massProperties = settings.MassPropertiesOverride;
-        massProperties.SetMassAndInertiaOfSolidBox(halfExtent * 2f, effectiveProfile.MassKg);
+        var boxSize = halfExtent * 2f;
+        var volumeCubicMeters = boxSize.X * boxSize.Y * boxSize.Z;
+        var densityKgPerCubicMeter = effectiveProfile.MassKg / volumeCubicMeters;
+        massProperties.SetMassAndInertiaOfSolidBox(boxSize, densityKgPerCubicMeter);
         settings.MassPropertiesOverride = massProperties;
         var id = Bodies.CreateAndAddBody(settings, motionType == MotionType.Static ? Activation.DontActivate : Activation.Activate);
         offsetShape?.Dispose();
@@ -276,6 +279,9 @@ public sealed partial class JoltPhysicsHost : IDisposable
         var buoyancyRatio = (profile.MassKg / volumeCubicMeters) / materialDensity;
         return profile with { BuoyancyRatio = buoyancyRatio };
     }
+
+    private static SourceRigidBodyProfile ApplySourceMassLimits(SourceRigidBodyProfile profile) =>
+        profile with { MassKg = Math.Clamp(profile.MassKg, 0.1f, 50000f) };
 
     public BodyID CreateStaticMeshBody(IReadOnlyList<Vector3> vertices, IReadOnlyList<IndexedTriangle> triangles,
         Vector3 position, SourceObjectLayer layer = SourceObjectLayer.World, SourceStaticMeshProfile? profile = null)

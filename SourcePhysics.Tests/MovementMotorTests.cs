@@ -2905,6 +2905,22 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceObjectParamsMassUsesVPhysicsCreationBounds()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize();
+        var minimum = host.CreateBoxBody(new(0.25f), Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { MassKg = 0.01f });
+        var maximum = host.CreateBoxBody(new(0.25f), new(2f, 0f, 0f), JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { MassKg = 100000f });
+
+        Assert.True(host.TryGetBodyMass(minimum, out var minimumMass));
+        Assert.True(host.TryGetBodyMass(maximum, out var maximumMass));
+        Assert.Equal(0.1f, minimumMass, 5);
+        Assert.Equal(50000f, maximumMass, 2);
+    }
+
+    [Fact]
     public void SourceDragLawUsesGeometryBasesAndSourceClamp()
     {
         var basis = SourceDragLaw.CreateBoxBasis(new Vector3(1f, 2f, 3f), 4f, 1f, 2f, 0.01f);
