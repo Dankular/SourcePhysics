@@ -64,6 +64,13 @@ public sealed record SourceConstraintProfile
     public bool UseClockwiseRotations { get; init; }
     public IReadOnlyList<SourceConstraintAxisLimit> RagdollAxes { get; init; } = Array.Empty<SourceConstraintAxisLimit>();
 
+    public SourceConstraintGroupParameters ToRuntimeGroupParameters()
+    {
+        Validate();
+        return new(AdditionalIterations, MinimumErrorTicks,
+            SourceUnits.ToMeters(ErrorToleranceSourceUnits));
+    }
+
     public void Validate()
     {
         if (!Enum.IsDefined(Type))
@@ -104,6 +111,12 @@ public sealed record SourceConstraintProfile
             throw new InvalidDataException($"{name} must be finite.");
     }
 }
+
+/// Backend-neutral group settings produced from the Source/VPhysics group
+/// contract. Native Jolt constraint creation consumes this only after its
+/// installed binding lifecycle is proven safe.
+public readonly record struct SourceConstraintGroupParameters(
+    int AdditionalIterations, int MinimumErrorTicks, float ErrorToleranceMeters);
 
 public readonly record struct SourceConstraintState(
     bool Active,

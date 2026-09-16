@@ -40,6 +40,11 @@ public sealed class SourceConstraintContractTests
         Assert.Equal(2f, profile.MaximumLimit);
         Assert.Equal(0.75f, profile.BreakStrength);
         Assert.Equal(2, profile.AdditionalIterations);
+
+        var runtimeGroup = profile.ToRuntimeGroupParameters();
+        Assert.Equal(2, runtimeGroup.AdditionalIterations);
+        Assert.Equal(15, runtimeGroup.MinimumErrorTicks);
+        Assert.Equal(SourceUnits.ToMeters(3f), runtimeGroup.ErrorToleranceMeters);
     }
 
     [Fact]
