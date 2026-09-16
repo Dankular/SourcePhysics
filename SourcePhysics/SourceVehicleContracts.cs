@@ -67,8 +67,8 @@ public sealed record SourceVehicleWheelProfile
     public float RotationalDamping { get; init; }
     public float FrictionScale { get; init; }
     public int MaterialId { get; init; }
-    public int BrakeMaterialId { get; init; }
-    public int SkidMaterialId { get; init; }
+    public int BrakeMaterialId { get; init; } = -1;
+    public int SkidMaterialId { get; init; } = -1;
     public float SpringAdditionalLengthSourceUnits { get; init; }
 }
 

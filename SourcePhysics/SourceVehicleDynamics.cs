@@ -16,6 +16,9 @@ public static class SourceVehicleDynamics
 
     public readonly record struct SpeedGovernorResult(float Throttle, float Brake);
     public readonly record struct PreparedControl(SourceVehicleControl Control, bool Powerslide);
+    public readonly record struct PowerslideResult(SourceVehicleTireType TireType,
+        float FrontAccelerationSourceUnitsPerSecondSquared,
+        float RearAccelerationSourceUnitsPerSecondSquared);
 
     /// Exact control preprocessing performed by CVehicleController::Update
     /// before steering, engine, handbrake and skid dispatch. Physics-system
@@ -47,6 +50,50 @@ public static class SourceVehicleDynamics
             brake = 0.1f;
 
         return new(control with { Throttle = throttle, Brake = brake }, powerslide);
+    }
+
+    /// Exact CVehicleController::UpdatePowerslide result. The caller applies
+    /// the returned front/rear accelerations to its Jolt body and resolves the
+    /// selected tire material per wheel.
+    public static PowerslideResult ResolvePowerslide(SourceVehicleProfile profile,
+        SourceVehicleControl control, bool powerslide, float speedSourceUnitsPerSecond,
+        bool occupied)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(control);
+        profile.Validate();
+        if (!float.IsFinite(speedSourceUnitsPerSecond))
+            throw new ArgumentOutOfRangeException(nameof(speedSourceUnitsPerSecond));
+        if (!profile.Steering.IsSkidAllowed || !occupied)
+            return new(SourceVehicleTireType.Normal, 0f, 0f);
+
+        var left = powerslide && control.HandbrakeLeft;
+        var right = powerslide && control.HandbrakeRight;
+        var tireType = left || right
+            ? SourceVehicleTireType.Powerslide
+            : powerslide ? SourceVehicleTireType.Braking : SourceVehicleTireType.Normal;
+        if (speedSourceUnitsPerSecond <= 0f || left == right)
+            return new(tireType, 0f, 0f);
+
+        var powerSlide = RemapClamped(SourceUnitsPerSecondToMilesPerHour(speedSourceUnitsPerSecond),
+            profile.Steering.SpeedSlowMilesPerHour,
+            profile.Steering.SpeedFastMilesPerHour, 0f, 1f);
+        var acceleration = profile.Steering.PowerslideAcceleration * powerSlide;
+        return left
+            ? new(tireType, acceleration, -acceleration)
+            : new(tireType, -acceleration, acceleration);
+    }
+
+    public static int ResolveWheelMaterialIndex(SourceVehicleWheelProfile wheel,
+        SourceVehicleTireType tireType)
+    {
+        ArgumentNullException.ThrowIfNull(wheel);
+        return tireType switch
+        {
+            SourceVehicleTireType.Powerslide when wheel.SkidMaterialId != -1 => wheel.SkidMaterialId,
+            SourceVehicleTireType.Braking when wheel.BrakeMaterialId != -1 => wheel.BrakeMaterialId,
+            _ => wheel.MaterialId
+        };
     }
 
     /// Exact CVehicleController::CalcEngine speed-governor branch from

@@ -164,6 +164,41 @@ public sealed class SourceVehicleDynamicsTests
     }
 
     [Fact]
+    public void PowerslideMatchesSourceOccupiedGateDirectionAndTireFallback()
+    {
+        var profile = Profile() with
+        {
+            Steering = new SourceVehicleSteeringProfile
+            {
+                IsSkidAllowed = true, SpeedSlowMilesPerHour = 0f,
+                SpeedFastMilesPerHour = 100f, PowerslideAcceleration = 10f
+            }
+        };
+        var left = SourceVehicleDynamics.ResolvePowerslide(profile,
+            new SourceVehicleControl { HandbrakeLeft = true }, true,
+            SourceVehicleDynamics.MilesPerHourToSourceUnitsPerSecond(50f), true);
+        Assert.Equal(SourceVehicleTireType.Powerslide, left.TireType);
+        Assert.Equal(5f, left.FrontAccelerationSourceUnitsPerSecondSquared, 4);
+        Assert.Equal(-5f, left.RearAccelerationSourceUnitsPerSecondSquared, 4);
+
+        var braking = SourceVehicleDynamics.ResolvePowerslide(profile,
+            new SourceVehicleControl(), true, 10f, true);
+        Assert.Equal(SourceVehicleTireType.Braking, braking.TireType);
+        Assert.Equal(0f, braking.FrontAccelerationSourceUnitsPerSecondSquared);
+        Assert.Equal(SourceVehicleTireType.Normal,
+            SourceVehicleDynamics.ResolvePowerslide(profile, new SourceVehicleControl(), true, 10f, false).TireType);
+    }
+
+    [Fact]
+    public void PowerslideMaterialSelectionPreservesSourceMinusOneFallback()
+    {
+        var wheel = new SourceVehicleWheelProfile { MaterialId = 4, BrakeMaterialId = 7 };
+        Assert.Equal(4, SourceVehicleDynamics.ResolveWheelMaterialIndex(wheel, SourceVehicleTireType.Normal));
+        Assert.Equal(7, SourceVehicleDynamics.ResolveWheelMaterialIndex(wheel, SourceVehicleTireType.Braking));
+        Assert.Equal(4, SourceVehicleDynamics.ResolveWheelMaterialIndex(wheel, SourceVehicleTireType.Powerslide));
+    }
+
+    [Fact]
     public void SkidStateSelectsFastestContactAndLocksToSpeedWhenHandbraking()
     {
         var profile = Profile() with
