@@ -14,6 +14,14 @@ public static class SourceVehicleDynamics
     public const float AirboatPontoonAreaSquareMeters = 2.8f;
     public const float AirboatPontoonHeightSourceUnits = 0.41f;
     public const float AirboatPontoonCount = 4f;
+    public const float AirboatWaterDragLeftRight = 0.6f;
+    public const float AirboatWaterDragForwardBack = 0.005f;
+    public const float AirboatWaterDragUpDown = 0.0025f;
+    public const float AirboatGroundDragLeftRight = 2f;
+    public const float AirboatGroundDragForwardBack = 1f;
+    public const float AirboatGroundDragUpDown = 0.8f;
+    public const float AirboatDryFrictionScale = 0.6f;
+    public const float AirboatGravity = 9.81f;
     public const float MilesPerHourToMetersPerSecond = 0.44707f;
     public const float WattsPerHorsepower = 745f;
     public const float SecondsPerMinute = 60f;
@@ -274,6 +282,56 @@ public static class SourceVehicleDynamics
         var force = AirboatBuoyancyScalar * (1f / AirboatPontoonCount) * bodyMassKg *
             submergedVolume * 1000f;
         return (force, force * deltaSeconds);
+    }
+
+    /// Exact local-space water drag impulse from CPhysics_Airboat::DoSimulationDrag.
+    /// The source code intentionally leaves the averaged water dampening unused;
+    /// this method preserves that behavior.
+    public static Vector3 ComputeAirboatWaterDragImpulse(Vector3 localVelocity,
+        float speedMetersPerSecond, float bodyMassKg, float deltaSeconds)
+    {
+        ValidateAirboatDragInputs(localVelocity, speedMetersPerSecond, bodyMassKg, deltaSeconds);
+        var negative = -localVelocity;
+        var directionalDrag = new Vector3(
+            AirboatWaterDragLeftRight * negative.X,
+            AirboatWaterDragUpDown * negative.Y,
+            AirboatWaterDragForwardBack * negative.Z);
+        return directionalDrag * (speedMetersPerSecond * bodyMassKg * deltaSeconds);
+    }
+
+    /// Exact local-space ground friction drag impulse from
+    /// CPhysics_Airboat::DoSimulationDrag. Source divides by speed before
+    /// applying the directional ground-drag coefficients.
+    public static Vector3 ComputeAirboatGroundDragImpulse(Vector3 localVelocity,
+        float speedMetersPerSecond, float bodyMassKg, float averageGroundFriction,
+        float deltaSeconds)
+    {
+        ValidateAirboatDragInputs(localVelocity, speedMetersPerSecond, bodyMassKg, deltaSeconds);
+        if (!float.IsFinite(averageGroundFriction) || averageGroundFriction < 0f)
+            throw new ArgumentOutOfRangeException(nameof(averageGroundFriction));
+        if (speedMetersPerSecond <= 0f) return Vector3.Zero;
+        var frictionDrag = bodyMassKg * AirboatGravity * AirboatDryFrictionScale * averageGroundFriction /
+            speedMetersPerSecond;
+        var negative = -localVelocity;
+        var directionalDrag = new Vector3(
+            AirboatGroundDragLeftRight * negative.X,
+            AirboatGroundDragUpDown * negative.Y,
+            AirboatGroundDragForwardBack * negative.Z);
+        return directionalDrag * (frictionDrag * deltaSeconds);
+    }
+
+    private static void ValidateAirboatDragInputs(Vector3 localVelocity,
+        float speedMetersPerSecond, float bodyMassKg, float deltaSeconds)
+    {
+        if (!float.IsFinite(localVelocity.X) || !float.IsFinite(localVelocity.Y) ||
+            !float.IsFinite(localVelocity.Z))
+            throw new ArgumentOutOfRangeException(nameof(localVelocity));
+        if (!float.IsFinite(speedMetersPerSecond) || speedMetersPerSecond < 0f)
+            throw new ArgumentOutOfRangeException(nameof(speedMetersPerSecond));
+        if (!float.IsFinite(bodyMassKg) || bodyMassKg < 0f)
+            throw new ArgumentOutOfRangeException(nameof(bodyMassKg));
+        if (!float.IsFinite(deltaSeconds) || deltaSeconds < 0f)
+            throw new ArgumentOutOfRangeException(nameof(deltaSeconds));
     }
 
     public static float SourceUnitsPerSecondToMilesPerHour(float sourceUnitsPerSecond) =>

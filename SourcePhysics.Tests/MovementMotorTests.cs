@@ -2879,6 +2879,20 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceAirboatDragMatchesDirectionalWaterAndGroundImpulseLaws()
+    {
+        var water = SourceVehicleDynamics.ComputeAirboatWaterDragImpulse(
+            new(2f, -3f, 4f), 5f, 10f, 0.1f);
+        Assert.InRange(Vector3.Distance(new Vector3(-6f, 0.0375f, -0.1f), water), 0f, 0.000001f);
+
+        var ground = SourceVehicleDynamics.ComputeAirboatGroundDragImpulse(
+            new(2f, -3f, 4f), 5f, 10f, 0.5f, 0.1f);
+        Assert.InRange(Vector3.Distance(new Vector3(-2.3544f, 1.41264f, -2.3544f), ground), 0f, 0.0001f);
+        Assert.Equal(Vector3.Zero,
+            SourceVehicleDynamics.ComputeAirboatGroundDragImpulse(Vector3.One, 0f, 10f, 0.5f, 0.1f));
+    }
+
+    [Fact]
     public void SourcePushawayPolicyMatchesSourceForceClampAndSpeedGate()
     {
         var profile = new SourcePushawayProfile();
