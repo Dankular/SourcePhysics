@@ -120,8 +120,12 @@ public sealed class JoltHitscanWeapon : SyncScript
     public IReadOnlyList<ShotResult> FireBullets(in SourceFireBulletsInfo info, int sourceRandomSeed)
     {
         if (info.Shots < 1) throw new ArgumentOutOfRangeException(nameof(info), "Shots must be positive.");
+        if (!IsFinite(info.OriginMeters) || !IsFinite(info.Direction) || !IsFinite(info.Spread))
+            throw new ArgumentOutOfRangeException(nameof(info), "Origin, direction and spread must be finite.");
         if (!float.IsFinite(info.DistanceMeters) || info.DistanceMeters <= 0f)
             throw new ArgumentOutOfRangeException(nameof(info), "Distance must be finite and positive.");
+        if (info.TracerFrequency < 0)
+            throw new ArgumentOutOfRangeException(nameof(info), "Tracer frequency cannot be negative.");
         if (!float.IsFinite(info.Damage) || info.Damage < 0f || info.PlayerDamage < 0)
             throw new ArgumentOutOfRangeException(nameof(info), "Damage must be non-negative and finite.");
         if (!float.IsFinite(info.DamageForceScale) || info.DamageForceScale < 0f)
@@ -285,4 +289,7 @@ public sealed class JoltHitscanWeapon : SyncScript
         foreach (var trigger in triggerQueries.CastTriggers(origin, direction, distance))
             TriggerHit?.Invoke(trigger);
     }
+
+    private static bool IsFinite(Vector3 value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
 }

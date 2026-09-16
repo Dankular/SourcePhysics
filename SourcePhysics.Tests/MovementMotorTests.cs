@@ -163,6 +163,20 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void FireBulletsRejectsInvalidAuthoredShotInputs()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        var weapon = new JoltHitscanWeapon();
+        weapon.Initialize(host);
+        Assert.Throws<ArgumentOutOfRangeException>(() => weapon.FireBullets(
+            new SourceFireBulletsInfo(1, new Vector3(float.NaN, 0f, 0f), Vector3.UnitX,
+                Vector3.Zero, 10f, 0), 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => weapon.FireBullets(
+            new SourceFireBulletsInfo(1, Vector3.Zero, Vector3.UnitX, Vector3.Zero,
+                10f, 0, TracerFrequency: -1), 1));
+    }
+
+    [Fact]
     public void SourceFluidTouchDampingMatchesReferencedLinearAndAngularTerms()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
