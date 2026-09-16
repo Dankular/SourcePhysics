@@ -2921,6 +2921,26 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceSetMassUsesOneKilogramRuntimeMinimumAndRecomputesVolumeBuoyancy()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize();
+        host.Surfaces.Register(45, new SourceSurface("dense", DensityKgPerM3: 2000f));
+        var body = host.CreateBoxBody(new(0.25f), Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                MassKg = 2f, VolumeCubicInches = 10f, BuoyancyRatio = 0.25f
+            }, 45);
+
+        host.SetBodyMass(body, 0.01f);
+
+        Assert.True(host.TryGetBodyMass(body, out var mass));
+        Assert.Equal(1f, mass, 5);
+        var volumeCubicMeters = 10f * MathF.Pow(SourceUnits.InchesToMeters, 3f);
+        Assert.Equal((1f / volumeCubicMeters) / 2000f, host.GetBodyBuoyancyRatio(body), 5);
+    }
+
+    [Fact]
     public void SourceDragLawUsesGeometryBasesAndSourceClamp()
     {
         var basis = SourceDragLaw.CreateBoxBasis(new Vector3(1f, 2f, 3f), 4f, 1f, 2f, 0.01f);

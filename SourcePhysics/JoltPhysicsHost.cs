@@ -20,6 +20,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
     private readonly Dictionary<uint, int> bodySurfaces = new();
     private readonly Dictionary<uint, SourceRigidBodyProfile> bodyProfiles = new();
     private readonly Dictionary<uint, SourceDragBasis> bodyDragBases = new();
+    private readonly Dictionary<uint, Vector3> bodyHalfExtents = new();
     private readonly Dictionary<uint, SourceContents> bodyContents = new();
     private readonly Dictionary<uint, SourceObjectLayer> bodyLayers = new();
     private readonly Dictionary<uint, SourceObjectLayer> bodyRequestedLayers = new();
@@ -244,6 +245,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         if (motionType == MotionType.Static) staticBodies.Add(id.ID);
         bodySurfaces[id.ID] = surfaceId;
         bodyProfiles[id.ID] = effectiveProfile;
+        bodyHalfExtents[id.ID] = halfExtent;
         if (motionType != MotionType.Static && effectiveProfile.EnableDrag &&
             (effectiveProfile.DragCoefficientPerSecond != 0f || effectiveProfile.RollingDragCoefficientPerSecond != 0f))
         {
@@ -524,6 +526,43 @@ public sealed partial class JoltPhysicsHost : IDisposable
         return float.IsFinite(massKilograms) && massKilograms > 0f;
     }
 
+    /// <summary>Applies Source CPhysicsObject::SetMass semantics to a dynamic box body.</summary>
+    public void SetBodyMass(BodyID bodyId, float massKilograms)
+    {
+        EnsureDynamicBody(bodyId);
+        if (!float.IsFinite(massKilograms)) throw new ArgumentOutOfRangeException(nameof(massKilograms));
+        var effectiveMass = Math.Clamp(massKilograms, 1f, 50000f);
+        if (!bodyProfiles.TryGetValue(bodyId.ID, out var profile))
+            throw new InvalidOperationException("Body has no Source rigid-body profile.");
+
+        var surfaceId = bodySurfaces.TryGetValue(bodyId.ID, out var storedSurfaceId) ? storedSurfaceId : 0;
+        var updatedProfile = ApplySourceVolumeBuoyancy(profile with { MassKg = effectiveMass }, surfaceId);
+        if (updatedProfile.VolumeCubicInches <= 0f)
+            updatedProfile = updatedProfile with { BuoyancyRatio = 1f };
+
+        var lockInterface = System.BodyLockInterfaceNoLock;
+        lockInterface.LockWrite(in bodyId, out var lockWrite);
+        if (!lockWrite.Succeeded || lockWrite.Body is null)
+            throw new InvalidOperationException("Jolt could not lock the body for mass mutation.");
+        try
+        {
+            lockWrite.Body.MotionProperties.ScaleToMass(effectiveMass);
+        }
+        finally
+        {
+            lockInterface.UnlockWrite(in lockWrite);
+        }
+
+        bodyProfiles[bodyId.ID] = updatedProfile;
+        if (bodyHalfExtents.TryGetValue(bodyId.ID, out var halfExtent) && updatedProfile.EnableDrag &&
+            (updatedProfile.DragCoefficientPerSecond != 0f || updatedProfile.RollingDragCoefficientPerSecond != 0f))
+        {
+            bodyDragBases[bodyId.ID] = SourceDragLaw.CreateBoxBasis(halfExtent, effectiveMass,
+                updatedProfile.InertiaScale, updatedProfile.DragCoefficientPerSecond,
+                updatedProfile.RollingDragCoefficientPerSecond);
+        }
+    }
+
     public void MoveKinematic(BodyID bodyId, Vector3 targetPosition, Quaternion targetRotation, float deltaSeconds)
     {
         if (!initialized || !bodyId.IsValid || !Bodies.IsAdded(bodyId))
@@ -688,6 +727,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodySurfaces.Remove(id.ID);
         bodyProfiles.Remove(id.ID);
         bodyDragBases.Remove(id.ID);
+        bodyHalfExtents.Remove(id.ID);
         bodyContents.Remove(id.ID);
         perTriangleSurfaceBodies.Remove(id.ID);
         sensorBodies.Remove(id.ID);
