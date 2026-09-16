@@ -46,9 +46,7 @@ public sealed class SourceMultiDamageAccumulator
         var adjusted = target is ISourceDamageTargetAdjustment adjustment
             ? adjustment.AdjustTraceAttack(info, direction, hit)
             : info;
-        if (!float.IsFinite(adjusted.Damage) || adjusted.Damage < 0f ||
-            !float.IsFinite(adjusted.MaxDamage) || adjusted.MaxDamage < 0f)
-            throw new InvalidOperationException("TraceAttack adjustment returned invalid damage.");
+        ValidateInfo(adjusted, "TraceAttack adjustment");
         target.TraceAttack(adjusted, direction, hit);
         AddMultiDamage(targetId, target, adjusted);
     }
@@ -56,6 +54,7 @@ public sealed class SourceMultiDamageAccumulator
     public void AddMultiDamage(int targetId, ISourceDamageTarget target, in SourceDamageInfo info)
     {
         ArgumentNullException.ThrowIfNull(target);
+        ValidateInfo(info, "MultiDamage");
         if (hasDamage && this.targetId != targetId) ApplyMultiDamage();
         if (!hasDamage)
         {
@@ -97,6 +96,18 @@ public sealed class SourceMultiDamageAccumulator
         accumulated = default;
         hasDamage = false;
     }
+
+    private static void ValidateInfo(in SourceDamageInfo info, string operation)
+    {
+        if (!float.IsFinite(info.Damage) || info.Damage < 0f ||
+            !float.IsFinite(info.MaxDamage) || info.MaxDamage < 0f ||
+            !IsFinite(info.DamageForce) || !IsFinite(info.DamagePosition) ||
+            !IsFinite(info.ReportedPosition) || info.PlayerPenetrationCount < 0)
+            throw new InvalidOperationException($"{operation} returned invalid damage data.");
+    }
+
+    private static bool IsFinite(Vector3 value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
 
     public void Flush(Func<int, ISourceDamageTarget?> targetResolver)
     {

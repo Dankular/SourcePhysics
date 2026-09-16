@@ -31,6 +31,17 @@ public sealed class SourceDamageAdjustmentTests
             Vector3.UnitZ, default));
     }
 
+    [Fact]
+    public void DirectMultiDamageRejectsInvalidForceAndPenetrationData()
+    {
+        var accumulator = new SourceMultiDamageAccumulator();
+        var invalid = new SourceDamageInfo(1f, 1f, new Vector3(float.NaN, 0f, 0f),
+            Vector3.Zero, Vector3.Zero, 0, 0, PlayerPenetrationCount: -1);
+
+        Assert.Throws<InvalidOperationException>(() => accumulator.AddMultiDamage(
+            1, new AdjustingTarget(), invalid));
+    }
+
     private sealed class AdjustingTarget : ISourceDamageTarget, ISourceDamageTargetAdjustment
     {
         public float TracedDamage { get; private set; }
