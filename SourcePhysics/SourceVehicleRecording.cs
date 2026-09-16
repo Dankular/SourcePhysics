@@ -44,6 +44,10 @@ public sealed class SourceVehicleRecording
             if (frame.Tick < 0 || frame.Tick <= previousTick)
                 throw new InvalidDataException("Vehicle recording ticks must be non-negative and strictly increasing.");
             previousTick = frame.Tick;
+            ValidateFinite(frame.Control.Throttle, "throttle");
+            ValidateFinite(frame.Control.Steering, "steering");
+            ValidateFinite(frame.Control.Brake, "brake");
+            ValidateFinite(frame.Control.Boost, "boost");
             ValidateFinite(frame.OperatingState.SpeedSourceUnitsPerSecond, "speed");
             ValidateFinite(frame.OperatingState.EngineRpm, "engine-rpm");
             ValidateFinite(frame.OperatingState.BoostDelaySeconds, "boost-delay");
@@ -126,13 +130,9 @@ public static class SourceVehicleRecordingComparator
                 timing++;
                 errors.Add(new(left.Tick, -1, "tick"));
             }
-            CompareControl(left.Tick, left.Control, right.Control, errors);
-            CompareOperating(left.Tick, left.OperatingState, right.OperatingState, errors);
-            CompareNumeric(left.Tick, -1, left.OperatingState.SpeedSourceUnitsPerSecond,
-                right.OperatingState.SpeedSourceUnitsPerSecond, "speed", numericTolerance,
+            CompareControl(left.Tick, left.Control, right.Control, numericTolerance,
                 ref maximum, ref sum, ref samples, errors);
-            CompareNumeric(left.Tick, -1, left.OperatingState.EngineRpm,
-                right.OperatingState.EngineRpm, "engine-rpm", numericTolerance,
+            CompareOperating(left.Tick, left.OperatingState, right.OperatingState, numericTolerance,
                 ref maximum, ref sum, ref samples, errors);
             if (left.Contacts.Length != right.Contacts.Length)
                 errors.Add(new(left.Tick, -1, "contact-count"));
@@ -158,12 +158,17 @@ public static class SourceVehicleRecordingComparator
     }
 
     private static void CompareControl(int tick, SourceVehicleControl a, SourceVehicleControl b,
+        float tolerance, ref float maximum, ref float sum, ref int samples,
         List<SourceVehicleParityError> errors)
     {
-        if (a.Throttle != b.Throttle) errors.Add(new(tick, -1, "throttle"));
-        if (a.Steering != b.Steering) errors.Add(new(tick, -1, "steering"));
-        if (a.Brake != b.Brake) errors.Add(new(tick, -1, "brake"));
-        if (a.Boost != b.Boost) errors.Add(new(tick, -1, "boost"));
+        CompareNumeric(tick, -1, a.Throttle, b.Throttle, "throttle", tolerance,
+            ref maximum, ref sum, ref samples, errors);
+        CompareNumeric(tick, -1, a.Steering, b.Steering, "steering", tolerance,
+            ref maximum, ref sum, ref samples, errors);
+        CompareNumeric(tick, -1, a.Brake, b.Brake, "brake", tolerance,
+            ref maximum, ref sum, ref samples, errors);
+        CompareNumeric(tick, -1, a.Boost, b.Boost, "boost", tolerance,
+            ref maximum, ref sum, ref samples, errors);
         if (a.Handbrake != b.Handbrake || a.HandbrakeLeft != b.HandbrakeLeft ||
             a.HandbrakeRight != b.HandbrakeRight || a.BrakePedal != b.BrakePedal ||
             a.HasBrakePedal != b.HasBrakePedal || a.AnalogSteering != b.AnalogSteering)
@@ -171,8 +176,19 @@ public static class SourceVehicleRecordingComparator
     }
 
     private static void CompareOperating(int tick, SourceVehicleOperatingState a,
-        SourceVehicleOperatingState b, List<SourceVehicleParityError> errors)
+        SourceVehicleOperatingState b, float tolerance, ref float maximum, ref float sum,
+        ref int samples, List<SourceVehicleParityError> errors)
     {
+        CompareNumeric(tick, -1, a.SpeedSourceUnitsPerSecond, b.SpeedSourceUnitsPerSecond,
+            "speed", tolerance, ref maximum, ref sum, ref samples, errors);
+        CompareNumeric(tick, -1, a.EngineRpm, b.EngineRpm, "engine-rpm", tolerance,
+            ref maximum, ref sum, ref samples, errors);
+        CompareNumeric(tick, -1, a.BoostDelaySeconds, b.BoostDelaySeconds, "boost-delay",
+            tolerance, ref maximum, ref sum, ref samples, errors);
+        CompareNumeric(tick, -1, a.SkidSpeedSourceUnitsPerSecond, b.SkidSpeedSourceUnitsPerSecond,
+            "skid-speed", tolerance, ref maximum, ref sum, ref samples, errors);
+        CompareNumeric(tick, -1, a.SteeringAngleDegrees, b.SteeringAngleDegrees,
+            "steering-angle", tolerance, ref maximum, ref sum, ref samples, errors);
         if (a.Gear != b.Gear) errors.Add(new(tick, -1, "gear"));
         if (a.BoostTimeLeftMilliseconds != b.BoostTimeLeftMilliseconds)
             errors.Add(new(tick, -1, "boost-time"));

@@ -204,11 +204,18 @@ public sealed class SourceVehicleDynamicsTests
         var altered = SourceVehicleRecording.FromJson(recording.ToJson());
         altered.Frames[0] = altered.Frames[0] with
         {
-            OperatingState = altered.Frames[0].OperatingState with { SpeedSourceUnitsPerSecond = 11f }
+            Control = altered.Frames[0].Control with { Throttle = 0.5f },
+            OperatingState = altered.Frames[0].OperatingState with
+            {
+                SpeedSourceUnitsPerSecond = 11f,
+                BoostDelaySeconds = 0.25f
+            }
         };
         var comparison = SourceVehicleRecordingComparator.Compare(recording, altered, 0.1f);
         Assert.False(comparison.Passes(0.1f));
         Assert.Contains(comparison.Errors, error => error.Field == "speed");
+        Assert.Contains(comparison.Errors, error => error.Field == "throttle");
+        Assert.Contains(comparison.Errors, error => error.Field == "boost-delay");
         Assert.True(comparison.NumericMaximum > 0.9f);
     }
 
