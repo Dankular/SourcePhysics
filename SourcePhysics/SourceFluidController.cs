@@ -131,6 +131,12 @@ public sealed class JoltFluidController : IDisposable
     private void Track(SourceTriggerEvent value)
     {
         if (!fluids.ContainsKey(value.TriggerBody)) return;
+        var bodyId = new BodyID(value.OtherBody);
+        if (!host.IsFluidTouchEnabled(bodyId))
+        {
+            active.Remove((value.TriggerBody, value.OtherBody));
+            return;
+        }
         var normal = value.Normal.LengthSquared() > 1e-12f ? Vector3.Normalize(value.Normal) : fluids[value.TriggerBody].SurfaceNormal;
         active[(value.TriggerBody, value.OtherBody)] = new(value.ContactPoint, normal);
     }

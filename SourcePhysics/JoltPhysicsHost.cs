@@ -390,6 +390,9 @@ public sealed partial class JoltPhysicsHost : IDisposable
     public bool IsFluidSimulationEnabled(BodyID id) =>
         !bodyProfiles.TryGetValue(id.ID, out var profile) ||
         (profile.CallbackFlags & SourceCallbackFlags.DoFluidSimulation) != 0;
+    public bool IsFluidTouchEnabled(BodyID id) =>
+        !bodyProfiles.TryGetValue(id.ID, out var profile) ||
+        (profile.CallbackFlags & SourceCallbackFlags.FluidTouch) != 0;
     public SourceCollisionGroup GetBodyCollisionGroup(BodyID id) =>
         bodyCollisionGroups.TryGetValue(id.ID, out var group) ? group : SourceCollisionGroup.None;
     public bool CanQueryCollide(SourceCollisionGroup queryGroup, BodyID bodyId) =>

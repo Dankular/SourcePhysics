@@ -2803,6 +2803,34 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void JoltFluidControllerHonorsSourceFluidTouchCallbackFlag()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize();
+        var fluid = host.CreateBoxBody(new(5f), Vector3.Zero, JoltPhysicsSharp.MotionType.Static,
+            SourceObjectLayer.Trigger);
+        host.CreateBoxBody(new(0.1f), Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                CallbackFlags = SourceCallbackFlags.Default & ~SourceCallbackFlags.FluidTouch
+            });
+        using var controller = new JoltFluidController(host);
+        controller.RegisterFluidBody(fluid, new SourceFluidProfile
+        {
+            SurfacePlane = new Vector4(0f, 1f, 0f, 0f),
+            DensityKgPerM3 = 1000f,
+            Damping = 1f,
+            TorqueFactor = 0.01f,
+            ViscosityFactor = 0.1f
+        });
+        controller.RegisterFixedStep();
+
+        host.Step();
+
+        Assert.Equal(0, controller.ActiveContactCount);
+    }
+
+    [Fact]
     public void SourceNetworkSerializationPreservesCommandsAndCorrections()
     {
         var command = new SourceCommand(12, new SourceInput(new(0.25f, -1f), Buttons.Jump,
