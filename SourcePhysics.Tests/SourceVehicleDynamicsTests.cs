@@ -1,3 +1,4 @@
+using System.Numerics;
 using SourcePhysics;
 using Xunit;
 
@@ -185,6 +186,30 @@ public sealed class SourceVehicleDynamicsTests
         Assert.Equal((0f, 0f), SourceVehicleDynamics.ComputeSuspensionForce(
             1f, 1f, 10f, 2f, 4f, 1f, default, default,
             new System.Numerics.Vector3(0f, 1f, 0f), 0.1f));
+    }
+
+    [Fact]
+    public void VehicleRecordingRoundTripsAndReportsNumericAndDiscreteDivergence()
+    {
+        var recording = new SourceVehicleRecording();
+        recording.Capture(0, new SourceVehicleControl { Throttle = 1f },
+            new SourceVehicleOperatingState { SpeedSourceUnitsPerSecond = 10f, Gear = 1 },
+            new[] { new SourceVehicleWheelContact(true, Vector3.Zero, Vector3.UnitY, 0.5f, 3, 0.8f) },
+            new[] { new SourceVehicleWheelSkidSample(true, Vector3.UnitX, 3) });
+
+        var restored = SourceVehicleRecording.FromJson(recording.ToJson());
+        var same = SourceVehicleRecordingComparator.Compare(recording, restored);
+        Assert.True(same.Passes(0f), string.Join(",", same.Errors));
+
+        var altered = SourceVehicleRecording.FromJson(recording.ToJson());
+        altered.Frames[0] = altered.Frames[0] with
+        {
+            OperatingState = altered.Frames[0].OperatingState with { SpeedSourceUnitsPerSecond = 11f }
+        };
+        var comparison = SourceVehicleRecordingComparator.Compare(recording, altered, 0.1f);
+        Assert.False(comparison.Passes(0.1f));
+        Assert.Contains(comparison.Errors, error => error.Field == "speed");
+        Assert.True(comparison.NumericMaximum > 0.9f);
     }
 
     private static SourceVehicleProfile Profile() => new()
