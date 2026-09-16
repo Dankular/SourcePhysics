@@ -1158,6 +1158,7 @@ public sealed class MovementMotorTests
         weapon.Recording = recording;
         weapon.IsPlayerTarget = _ => true;
         weapon.BulletForceResolver = _ => 100f;
+        weapon.PhysicsPushScale = 1.5f;
         weapon.DamageTargetResolver = _ => damageTarget;
         weapon.DamageTargetIdResolver = _ => 9001;
         weapon.Impact += impacts.Add;
@@ -1175,7 +1176,7 @@ public sealed class MovementMotorTests
         Assert.All(impacts, impact => Assert.Equal(0x3234, impact.DamageType));
         Assert.All(impacts, impact => Assert.Equal(0.5f, impact.DamageForceScale));
         Assert.All(impacts, impact => Assert.True(impact.PrimaryAttack));
-        Assert.All(impacts, impact => Assert.Equal(new Vector3(0f, 0f, 50f), impact.DamageForce));
+        Assert.All(impacts, impact => Assert.Equal(new Vector3(0f, 0f, 75f), impact.DamageForce));
         Assert.Equal(SourceHitGroup.Generic, impacts[0].Metadata.HitGroup);
         Assert.Equal(0, impacts[0].ShotIndex);
         Assert.Equal(1, impacts[1].ShotIndex);
@@ -1184,11 +1185,11 @@ public sealed class MovementMotorTests
         Assert.Equal(25f, recording.Frames[0].AppliedDamage);
         Assert.Equal(0x3234, recording.Frames[0].DamageType);
         Assert.Equal(SourceFireBulletsFlags.FirstShotAccurate, recording.Frames[0].Flags);
-        Assert.Equal(new Vector3(0f, 0f, 50f), recording.Frames[0].DamageForce);
+        Assert.Equal(new Vector3(0f, 0f, 75f), recording.Frames[0].DamageForce);
         Assert.Equal(2, damageTarget.TraceCount);
         Assert.Equal(1, damageTarget.TakeDamageCount);
         Assert.Equal(50f, damageTarget.LastDamage.Damage);
-        Assert.Equal(new Vector3(0f, 0f, 100f), damageTarget.LastDamage.DamageForce);
+        Assert.Equal(new Vector3(0f, 0f, 150f), damageTarget.LastDamage.DamageForce);
         Assert.Equal(0x3234, damageTarget.LastDamage.DamageType);
         Assert.Equal(101, damageTarget.LastDamage.InflictorBodyId);
         Assert.Equal(202, damageTarget.LastDamage.AttackerBodyId);

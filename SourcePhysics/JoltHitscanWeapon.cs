@@ -31,6 +31,9 @@ public sealed class JoltHitscanWeapon : SyncScript
     /// Resolves the title AmmoDef::DamageForce value for an ammo index. The
     /// integer index is intentionally not mapped to a guessed ammo table.
     public Func<int, float>? BulletForceResolver { get; set; }
+    /// Source replicated phys_pushscale. The Source default is 1 and the title
+    /// may change it; it is applied before FireBulletsInfo_t's force scale.
+    public float PhysicsPushScale { get; set; } = 1f;
     /// Resolves the title AmmoDef fields consumed by CBaseEntity::FireBullets.
     /// A null resolver leaves the already-resolved fields on SourceFireBulletsInfo
     /// unchanged; no ammo-table defaults are inferred here.
@@ -140,6 +143,8 @@ public sealed class JoltHitscanWeapon : SyncScript
             throw new ArgumentOutOfRangeException(nameof(info), "Damage must be non-negative and finite.");
         if (!float.IsFinite(info.DamageForceScale) || info.DamageForceScale < 0f)
             throw new ArgumentOutOfRangeException(nameof(info), "Damage force scale must be non-negative and finite.");
+        if (!float.IsFinite(PhysicsPushScale) || PhysicsPushScale < 0f)
+            throw new InvalidOperationException("PhysicsPushScale must be finite and non-negative.");
         var query = queries ?? throw new InvalidOperationException("The weapon must be started before firing.");
         var ammoDefinition = AmmoDefinitionResolver?.Invoke(info.AmmoType);
         var resolvedPlayerDamage = info.PlayerDamage;
@@ -214,7 +219,7 @@ public sealed class JoltHitscanWeapon : SyncScript
             if (!float.IsFinite(bulletForce) || bulletForce < 0f)
                 throw new InvalidOperationException("BulletForceResolver returned an invalid force value.");
             var damageForce = suppressDamage ? Vector3.Zero :
-                Vector3.Normalize(result.Direction) * bulletForce * info.DamageForceScale;
+                Vector3.Normalize(result.Direction) * bulletForce * PhysicsPushScale * info.DamageForceScale;
             var explicitDamage = !suppressDamage && (info.Damage != 0f || (isPlayer && resolvedPlayerDamage != 0));
             var actualDamageType = resolvedDamageType | (explicitDamage
                 ? damage > 16f ? 1 << 13 : 1 << 12
