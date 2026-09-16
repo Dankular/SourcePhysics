@@ -176,6 +176,20 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void JoltHitscanHonorsSourceIgnoredBodyIdentity()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize();
+        var near = host.CreateBoxBody(new(0.2f), new(0f, 0f, 2f),
+            JoltPhysicsSharp.MotionType.Static, SourceObjectLayer.World);
+        var far = host.CreateBoxBody(new(0.2f), new(0f, 0f, 4f),
+            JoltPhysicsSharp.MotionType.Static, SourceObjectLayer.World);
+        using var queries = new JoltHitscanQueries(host, ignoredBodyId: unchecked((int)near.ID));
+        Assert.True(queries.Cast(Vector3.Zero, Vector3.UnitZ, 6f, out var hit));
+        Assert.Equal(unchecked((int)far.ID), hit.BodyId);
+    }
+
+    [Fact]
     public void FireBulletsRejectsInvalidAuthoredShotInputs()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());

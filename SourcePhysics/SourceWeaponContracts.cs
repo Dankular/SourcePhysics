@@ -61,7 +61,8 @@ public readonly record struct SourceFireBulletsInfo(
     SourceFireBulletsFlags Flags = SourceFireBulletsFlags.None,
     float DamageForceScale = 1f,
     bool PrimaryAttack = true,
-    int DamageType = 0);
+    int DamageType = 0,
+    int AdditionalIgnoreBodyId = -1);
 
 public readonly record struct SourceHitMetadata(
     SourceHitGroup HitGroup = SourceHitGroup.Generic,

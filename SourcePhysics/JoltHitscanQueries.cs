@@ -61,7 +61,8 @@ public sealed class JoltHitscanQueries : IDisposable
 
     private readonly int ignoredBodyId;
 
-    public bool Cast(Vector3 start, Vector3 direction, float distance, out HitscanHit hit)
+    public bool Cast(Vector3 start, Vector3 direction, float distance, out HitscanHit hit,
+        int? ignoredBodyIdOverride = null)
     {
         ValidateRayValues(start, direction, distance);
         if (direction.LengthSquared() < 1e-12f || distance <= 0f)
@@ -76,7 +77,8 @@ public sealed class JoltHitscanQueries : IDisposable
         var result = default(RayCastResult);
         using var broadPhaseFilter = new AllBroadPhaseFilter();
         using var objectLayerFilter = new AllObjectLayerFilter();
-        using var bodyFilter = new AllBodyFilter(host, includeSensors, contentsMask, ignoredBodyId, queryCollisionGroup);
+        using var bodyFilter = new AllBodyFilter(host, includeSensors, contentsMask,
+            ignoredBodyIdOverride ?? ignoredBodyId, queryCollisionGroup);
         if (!host.NarrowPhase.CastRay(in origin, in rayDirection, out result, broadPhaseFilter, objectLayerFilter, bodyFilter))
         {
             hit = default;
@@ -89,7 +91,8 @@ public sealed class JoltHitscanQueries : IDisposable
 
     /// Returns all ordered ray intersections, preserving Jolt's sub-shape IDs for penetration and
     /// Source surface/material resolution. This is the ray equivalent of Source's repeated trace loop.
-    public IReadOnlyList<HitscanHit> CastAll(Vector3 start, Vector3 direction, float distance)
+    public IReadOnlyList<HitscanHit> CastAll(Vector3 start, Vector3 direction, float distance,
+        int? ignoredBodyIdOverride = null)
     {
         ValidateRayValues(start, direction, distance);
         if (direction.LengthSquared() < 1e-12f || distance <= 0f)
@@ -100,7 +103,8 @@ public sealed class JoltHitscanQueries : IDisposable
         var results = new List<RayCastResult>();
         using var broadPhaseFilter = new AllBroadPhaseFilter();
         using var objectLayerFilter = new AllObjectLayerFilter();
-        using var bodyFilter = new AllBodyFilter(host, includeSensors, contentsMask, ignoredBodyId, queryCollisionGroup);
+        using var bodyFilter = new AllBodyFilter(host, includeSensors, contentsMask,
+            ignoredBodyIdOverride ?? ignoredBodyId, queryCollisionGroup);
         var settings = new RayCastSettings();
         host.NarrowPhase.CastRay(in origin, in rayDirection, settings, CollisionCollectorType.AllHitSorted,
             results, broadPhaseFilter, objectLayerFilter, bodyFilter);
@@ -111,7 +115,7 @@ public sealed class JoltHitscanQueries : IDisposable
     /// hull for alternating player shotgun pellets. The hull is translated
     /// along the shot vector; it is not rotated to the shot direction.
     public bool CastHull(Vector3 start, Vector3 end, Vector3 halfExtentsSourceUnits,
-        out HitscanHit hit)
+        out HitscanHit hit, int? ignoredBodyIdOverride = null)
     {
         if (!IsFinite(start) || !IsFinite(end) || !IsFinite(halfExtentsSourceUnits) ||
             halfExtentsSourceUnits.X <= 0f || halfExtentsSourceUnits.Y <= 0f ||
@@ -129,7 +133,8 @@ public sealed class JoltHitscanQueries : IDisposable
         var results = new List<ShapeCastResult>();
         using var broadPhaseFilter = new AllBroadPhaseFilter();
         using var objectLayerFilter = new AllObjectLayerFilter();
-        using var bodyFilter = new AllBodyFilter(host, includeSensors, contentsMask, ignoredBodyId, queryCollisionGroup);
+        using var bodyFilter = new AllBodyFilter(host, includeSensors, contentsMask,
+            ignoredBodyIdOverride ?? ignoredBodyId, queryCollisionGroup);
         host.NarrowPhase.CastShape(shape, transform, displacement, RVector3.Zero,
             CollisionCollectorType.AllHitSorted, results, broadPhaseFilter, objectLayerFilter, bodyFilter, null!);
         if (results.Count == 0)
@@ -152,9 +157,10 @@ public sealed class JoltHitscanQueries : IDisposable
     /// Returns only sensor bodies intersected by the ray, in Jolt's ordered
     /// hit order. Source FireBullets dispatches shot-responsive triggers before
     /// processing the first solid impact.
-    public IReadOnlyList<HitscanHit> CastTriggers(Vector3 start, Vector3 direction, float distance)
+    public IReadOnlyList<HitscanHit> CastTriggers(Vector3 start, Vector3 direction, float distance,
+        int? ignoredBodyIdOverride = null)
     {
-        return CastAll(start, direction, distance)
+        return CastAll(start, direction, distance, ignoredBodyIdOverride)
             .Where(hit => host.IsSensor(new BodyID(unchecked((uint)hit.BodyId))))
             .ToArray();
     }

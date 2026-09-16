@@ -14,6 +14,8 @@ public sealed class JoltHitscanWeapon : SyncScript
     /// Set by the title when this component represents a player shooter. Source
     /// uses the player-only alternating shotgun hull path in FireBullets.
     public bool ShooterIsPlayer { get; set; }
+    /// Source entity identity excluded from every shot trace. -1 means none.
+    public int ShooterBodyId { get; set; } = -1;
     public WeaponRecording? Recording { get; set; }
     public int RecordingTick { get; set; }
     public event Action<HitscanHit>? Hit;
@@ -67,11 +69,13 @@ public sealed class JoltHitscanWeapon : SyncScript
     public void Initialize(JoltPhysicsHost host)
     {
         queries?.Dispose();
-        queries = new JoltHitscanQueries(host, IncludeSensors);
+        queries = new JoltHitscanQueries(host, IncludeSensors, ignoredBodyId: ShooterBodyId);
         waterQueries?.Dispose();
-        waterQueries = new JoltHitscanQueries(host, includeSensors: true, contentsMask: SourceContents.Water);
+        waterQueries = new JoltHitscanQueries(host, includeSensors: true, contentsMask: SourceContents.Water,
+            ignoredBodyId: ShooterBodyId);
         triggerQueries?.Dispose();
-        triggerQueries = new JoltHitscanQueries(host, includeSensors: true, contentsMask: SourceContents.MaskShot);
+        triggerQueries = new JoltHitscanQueries(host, includeSensors: true, contentsMask: SourceContents.MaskShot,
+            ignoredBodyId: ShooterBodyId);
     }
 
     public bool Fire(Vector3 originMeters, Vector3 direction, float distanceMeters, out HitscanHit hit)
@@ -159,14 +163,16 @@ public sealed class JoltHitscanWeapon : SyncScript
                     new SourceUniformRandomStream(shotSeed).RandomFloat);
             var useHull = ShooterIsPlayer && info.Shots > 1 && (shot & 1) != 0;
             var traceShape = useHull ? SourceShotTraceShape.PlayerAlternatingHull : SourceShotTraceShape.Ray;
+            var additionalIgnore = info.AdditionalIgnoreBodyId >= 0
+                ? info.AdditionalIgnoreBodyId : (int?)null;
             HitscanHit hit;
             var didHit = useHull
                 ? query.CastHull(info.OriginMeters,
                     info.OriginMeters + shotDirection * info.DistanceMeters,
-                    new Vector3(3f), out hit)
-                : query.Cast(info.OriginMeters, shotDirection, info.DistanceMeters, out hit);
+                    new Vector3(3f), out hit, additionalIgnore)
+                : query.Cast(info.OriginMeters, shotDirection, info.DistanceMeters, out hit, additionalIgnore);
             EmitTriggerHits(info.OriginMeters, shotDirection,
-                didHit ? info.DistanceMeters * hit.Fraction : info.DistanceMeters);
+                didHit ? info.DistanceMeters * hit.Fraction : info.DistanceMeters, additionalIgnore);
             if (didHit) RefineHitbox(info.OriginMeters, shotDirection, info.DistanceMeters, ref hit);
             results[shot] = new(didHit, shotDirection, hit);
             if (didHit) Hit?.Invoke(hit);
@@ -179,7 +185,8 @@ public sealed class JoltHitscanWeapon : SyncScript
             }
             var startedInWater = IsWaterPoint?.Invoke(info.OriginMeters) ?? false;
             var waterImpact = default(HitscanHit);
-            var waterHit = waterQueries?.Cast(info.OriginMeters, shotDirection, info.DistanceMeters, out waterImpact) == true &&
+            var waterHit = waterQueries?.Cast(info.OriginMeters, shotDirection, info.DistanceMeters, out waterImpact,
+                additionalIgnore) == true &&
                 (startedInWater || waterImpact.Fraction <= result.HitData.Fraction);
             var suppressDamage = waterHit && info.Flags.HasFlag(SourceFireBulletsFlags.DontHitUnderwater);
             var suppressImpact = waterHit && !startedInWater &&
@@ -293,10 +300,11 @@ public sealed class JoltHitscanWeapon : SyncScript
         if (HitboxCatalog is not null) HitboxCatalog.TryResolve(in hit, origin, direction, distance, out hit);
     }
 
-    private void EmitTriggerHits(Vector3 origin, Vector3 direction, float distance)
+    private void EmitTriggerHits(Vector3 origin, Vector3 direction, float distance,
+        int? ignoredBodyIdOverride = null)
     {
         if (triggerQueries is null) return;
-        foreach (var trigger in triggerQueries.CastTriggers(origin, direction, distance))
+        foreach (var trigger in triggerQueries.CastTriggers(origin, direction, distance, ignoredBodyIdOverride))
             TriggerHit?.Invoke(trigger);
     }
 
