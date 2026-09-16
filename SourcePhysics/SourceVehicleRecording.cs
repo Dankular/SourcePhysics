@@ -187,6 +187,7 @@ public static class SourceVehicleRecordingComparator
     {
         if (a.InContact != b.InContact) errors.Add(new(tick, wheel, "contact-state"));
         if (a.SurfaceId != b.SurfaceId) errors.Add(new(tick, wheel, "surface"));
+        if (a.BodyId != b.BodyId) errors.Add(new(tick, wheel, "body"));
         CompareVector(tick, wheel, a.ContactPointMeters, b.ContactPointMeters, "contact-point",
             tolerance, ref maximum, ref sum, ref samples, errors);
         CompareVector(tick, wheel, a.ContactNormal, b.ContactNormal, "contact-normal",

@@ -40,6 +40,7 @@ public sealed class JoltVehicleWheelQueriesTests
             Assert.True(contact.InContact);
             Assert.Equal(Vector3.UnitY, contact.ContactNormal);
             Assert.Equal(0, contact.SurfaceId);
+            Assert.True(contact.BodyId >= 0);
             Assert.True(contact.SuspensionLengthMeters > 0f);
         });
     }

@@ -194,7 +194,7 @@ public sealed class SourceVehicleDynamicsTests
         var recording = new SourceVehicleRecording();
         recording.Capture(0, new SourceVehicleControl { Throttle = 1f },
             new SourceVehicleOperatingState { SpeedSourceUnitsPerSecond = 10f, Gear = 1 },
-            new[] { new SourceVehicleWheelContact(true, Vector3.Zero, Vector3.UnitY, 0.5f, 3, 0.8f) },
+            new[] { new SourceVehicleWheelContact(true, Vector3.Zero, Vector3.UnitY, 0.5f, 3, 0.8f, 42) },
             new[] { new SourceVehicleWheelSkidSample(true, Vector3.UnitX, 3) });
 
         var restored = SourceVehicleRecording.FromJson(recording.ToJson());

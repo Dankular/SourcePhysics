@@ -55,7 +55,7 @@ public sealed class JoltVehicleWheelQueries
                 {
                     var surface = host.Surfaces.Get(hit.SurfaceId);
                     contacts[wheelIndex] = new(true, hit.Position, hit.Normal,
-                        hit.Fraction * lengthMeters, hit.SurfaceId, surface.Friction);
+                        hit.Fraction * lengthMeters, hit.SurfaceId, surface.Friction, hit.BodyId);
                 }
                 else
                 {
