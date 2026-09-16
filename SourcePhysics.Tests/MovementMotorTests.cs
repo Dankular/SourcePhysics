@@ -2909,6 +2909,21 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceAirboatSteeringMatchesReverseRampAndRotationalDragBranches()
+    {
+        var result = SourceVehicleDynamics.ComputeAirboatSteering(
+            0.5f, -1f, 0f, false, false, 0f, 0f, 0f, 100f, 0.1f);
+        Assert.True(result.SteeringReversed);
+        Assert.Equal(new Vector3(0f, -0.0045f, 0f), result.RotationalImpulse);
+        Assert.Equal(0.1f, result.SteerTime);
+        Assert.Equal(-0.5f, result.PreviousSteeringAngle);
+
+        var damped = SourceVehicleDynamics.ComputeAirboatSteering(
+            0f, 0f, 0f, false, false, 0f, 0f, 2f, 100f, 0.1f);
+        Assert.InRange(Vector3.Distance(new Vector3(0f, -0.0216f, 0f), damped.RotationalImpulse), 0f, 0.0001f);
+    }
+
+    [Fact]
     public void SourcePushawayPolicyMatchesSourceForceClampAndSpeedGate()
     {
         var profile = new SourcePushawayProfile();

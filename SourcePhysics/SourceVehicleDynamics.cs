@@ -22,6 +22,11 @@ public static class SourceVehicleDynamics
     public const float AirboatGroundDragUpDown = 0.8f;
     public const float AirboatDryFrictionScale = 0.6f;
     public const float AirboatGravity = 9.81f;
+    public const float AirboatSteeringRateMin = 0.00045f;
+    public const float AirboatSteeringRateMax = 0.00225f;
+    public const float AirboatSteeringInterval = 0.5f;
+    public const float AirboatRotationalDrag = 0.00004f;
+    public const float AirboatRotationalDamping = 0.001f;
     public const float MilesPerHourToMetersPerSecond = 0.44707f;
     public const float WattsPerHorsepower = 745f;
     public const float SecondsPerMinute = 60f;
@@ -31,6 +36,8 @@ public static class SourceVehicleDynamics
     public readonly record struct PowerslideResult(SourceVehicleTireType TireType,
         float FrontAccelerationSourceUnitsPerSecondSquared,
         float RearAccelerationSourceUnitsPerSecondSquared);
+    public readonly record struct AirboatSteeringResult(Vector3 RotationalImpulse,
+        bool SteeringReversed, float SteerTime, float PreviousSteeringAngle);
 
     /// Exact control preprocessing performed by CVehicleController::Update
     /// before steering, engine, handbrake and skid dispatch. Physics-system
@@ -342,6 +349,64 @@ public static class SourceVehicleDynamics
         else if (forwardWorld.Y > 0.5f && effectiveThrust < 0f)
             effectiveThrust *= 1f - forwardWorld.Y;
         return forwardWorld * (effectiveThrust * bodyMassKg * deltaSeconds);
+    }
+
+    /// Exact CPhysics_Airboat::DoSimulationSteering state and rotational
+    /// impulse update for the non-X360 constants used by the supplied Source
+    /// reference. The result is expressed in the core's local coordinates.
+    public static AirboatSteeringResult ComputeAirboatSteering(
+        float steeringAngle, float thrust, float localForwardVelocity,
+        bool analogSteering, bool steeringReversed, float previousSteeringAngle,
+        float steerTime, float rotationalSpeedY, float bodyMassKg, float deltaSeconds)
+    {
+        if (!float.IsFinite(steeringAngle) || !float.IsFinite(thrust) ||
+            !float.IsFinite(localForwardVelocity) || !float.IsFinite(previousSteeringAngle) ||
+            !float.IsFinite(steerTime) || !float.IsFinite(rotationalSpeedY) ||
+            !float.IsFinite(bodyMassKg) || !float.IsFinite(deltaSeconds))
+            throw new ArgumentOutOfRangeException(nameof(steeringAngle));
+        if (steerTime < 0f || bodyMassKg < 0f || deltaSeconds < 0f)
+            throw new ArgumentOutOfRangeException(nameof(steerTime));
+
+        if (steeringAngle == 0f || thrust != 0f)
+        {
+            if (!analogSteering)
+            {
+                if (thrust < 0f) steeringReversed = true;
+                else if (thrust > 0f || localForwardVelocity > 0f) steeringReversed = false;
+            }
+            else
+            {
+                if (thrust < -2f) steeringReversed = true;
+                else if (thrust > 2f || localForwardVelocity > 0f) steeringReversed = false;
+            }
+        }
+
+        var steeringForce = 0f;
+        if (MathF.Abs(steeringAngle) > 0.01f)
+        {
+            var steeringSign = steeringAngle < 0f ? -1f : 1f;
+            if (steeringReversed) steeringSign *= -1f;
+            var previousSign = previousSteeringAngle < 0f ? -1f : 1f;
+            if (MathF.Abs(previousSteeringAngle) < 0.01f || steeringSign != previousSign)
+                steerTime = 0f;
+
+            var steerScale = analogSteering
+                ? RemapClamped(MathF.Abs(steeringAngle), 0f, AirboatSteeringInterval,
+                    AirboatSteeringRateMin, AirboatSteeringRateMax)
+                : RemapClamped(steerTime, 0f, AirboatSteeringInterval,
+                    AirboatSteeringRateMin, AirboatSteeringRateMax);
+            steeringForce = steerScale * bodyMassKg * deltaSeconds * -steeringSign;
+            steerTime += deltaSeconds;
+        }
+
+        var rotationalSign = rotationalSpeedY < 0f ? -1f : 1f;
+        var rotationalDrag = AirboatRotationalDrag * rotationalSpeedY * rotationalSpeedY *
+            bodyMassKg * deltaSeconds * rotationalSign;
+        var rotationalDamping = AirboatRotationalDamping * MathF.Abs(rotationalSpeedY) *
+            bodyMassKg * deltaSeconds * rotationalSign;
+        var rotationalForce = steeringForce + rotationalDrag + rotationalDamping;
+        return new(new Vector3(0f, -rotationalForce, 0f), steeringReversed,
+            steerTime, steeringAngle * (steeringReversed ? -1f : 1f));
     }
 
     private static void ValidateAirboatDragInputs(Vector3 localVelocity,
