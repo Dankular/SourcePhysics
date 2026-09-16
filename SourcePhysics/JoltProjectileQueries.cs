@@ -22,7 +22,9 @@ public sealed class JoltProjectileQueries : IProjectileQueries, IProjectilePenet
         SourceContents contentsMask = SourceContents.MaskShot,
         SourceCollisionGroup queryCollisionGroup = SourceCollisionGroup.Projectile)
     {
-        if (radiusSourceUnits <= 0f) throw new ArgumentOutOfRangeException(nameof(radiusSourceUnits));
+        ArgumentNullException.ThrowIfNull(host);
+        if (!float.IsFinite(radiusSourceUnits) || radiusSourceUnits <= 0f)
+            throw new ArgumentOutOfRangeException(nameof(radiusSourceUnits));
         this.host = host;
         this.penetrationCost = penetrationCost;
         this.contentsMask = contentsMask;

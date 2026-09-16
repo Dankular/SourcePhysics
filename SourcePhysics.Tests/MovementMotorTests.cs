@@ -141,6 +141,15 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void JoltProjectileQueryRejectsInvalidRadius()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        Assert.Throws<ArgumentOutOfRangeException>(() => new JoltProjectileQueries(host, float.NaN));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new JoltProjectileQueries(host, float.PositiveInfinity));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new JoltProjectileQueries(host, 0f));
+    }
+
+    [Fact]
     public void SourceFluidTouchDampingMatchesReferencedLinearAndAngularTerms()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
