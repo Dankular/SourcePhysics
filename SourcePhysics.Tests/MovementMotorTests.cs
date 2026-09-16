@@ -1942,6 +1942,13 @@ public sealed class MovementMotorTests
         var tooThick = SourceCounterStrikePenetration.TryPenetrate(in state,
             SourceBulletMaterial.Concrete, SourceBulletMaterial.Concrete, 100f, false, 1f);
         Assert.False(tooThick.Success);
+        Assert.Equal(state, tooThick.State);
+
+        var grate = SourceCounterStrikePenetration.TryPenetrate(
+            new SourcePenetrationState(100f, 30f, 0f, 0),
+            SourceBulletMaterial.Concrete, SourceBulletMaterial.Concrete, 1f, true, 1f);
+        Assert.True(grate.Success);
+        Assert.Equal(-1, grate.State.PenetrationsRemaining);
     }
 
     [Fact]

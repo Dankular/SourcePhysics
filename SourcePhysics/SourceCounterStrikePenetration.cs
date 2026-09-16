@@ -76,7 +76,7 @@ public static class SourceCounterStrikePenetration
             throw new ArgumentOutOfRangeException(nameof(thicknessInches));
         if (!float.IsFinite(rangeModifier) || rangeModifier < 0f)
             throw new ArgumentOutOfRangeException(nameof(rangeModifier));
-        if (state.PenetrationsRemaining == 0 || state.PenetrationPower <= 0f)
+        if (state.PenetrationsRemaining < 0 || state.PenetrationPower <= 0f)
             return new(state, 0f, 0f, enterIsGrate, false);
 
         var (penetrationModifier, damageModifier) = GetMaterialParameters(enterMaterial);
@@ -86,9 +86,12 @@ public static class SourceCounterStrikePenetration
             (enterMaterial == SourceBulletMaterial.Wood || enterMaterial == SourceBulletMaterial.Metal))
             penetrationModifier *= 2f;
         var distance = state.CurrentDistance + thicknessInches;
-        var damage = state.Damage * MathF.Pow(rangeModifier, distance / 500f);
         if (thicknessInches > state.PenetrationPower * penetrationModifier)
-            return new(state with { Damage = damage, CurrentDistance = distance }, penetrationModifier, damageModifier, hitGrate, false);
+            // Source has already applied range falloff at the entry trace. A failed
+            // exit test breaks before adding the wall thickness or applying the
+            // penetration damage modifier.
+            return new(state, penetrationModifier, damageModifier, hitGrate, false);
+        var damage = state.Damage * MathF.Pow(rangeModifier, distance / 500f);
         var next = state with
         {
             Damage = damage * damageModifier,

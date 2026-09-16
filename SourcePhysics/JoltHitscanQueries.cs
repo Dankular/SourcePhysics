@@ -214,33 +214,57 @@ public sealed class JoltHitscanQueries : IDisposable
         var impacts = new List<SourceCounterStrikeImpact>();
         var stopped = false;
         var currentStart = start;
-        var distanceTravelled = 0f;
-        while (distanceTravelled < distance)
+        // Source mutates the trace distance after each successful penetration:
+        // (old trace distance - cumulative travelled distance) * 0.5. This is
+        // intentionally not a conventional remaining-distance calculation.
+        var traceDistance = distance;
+        while (state.Damage > 0f && traceDistance > 0f)
         {
-            var remaining = distance - distanceTravelled;
-            if (!Cast(currentStart, direction, remaining, out var entry)) break;
-            var entryDistanceInches = SourceUnits.ToSource(distanceTravelled + entry.Fraction * remaining);
+            if (!Cast(currentStart, direction, traceDistance, out var entry)) break;
+            var entryDistanceInches = SourceUnits.ToSource(entry.Fraction * traceDistance);
             state = state with
             {
                 Damage = state.Damage * MathF.Pow(rangeModifier, entryDistanceInches / 500f),
-                CurrentDistance = entryDistanceInches
+                CurrentDistance = state.CurrentDistance + entryDistanceInches
             };
             impacts.Add(new(entry, false, state.Damage));
-            if (state.PenetrationsRemaining <= 0)
+            var entryIsGrate = (entry.Contents & SourceContents.Grate) != 0;
+            if (state.PenetrationsRemaining == 0 && !entryIsGrate)
+            {
+                stopped = true;
+                break;
+            }
+            // Source permits the current grate to be crossed when the counter
+            // reaches zero, then decrements it to -1 and stops at the next hit.
+            // A negative counter is never allowed to start another penetration.
+            if (state.PenetrationsRemaining < 0)
             {
                 stopped = true;
                 break;
             }
 
-            if (!TryCastExit(entry, direction, remaining * (1f - entry.Fraction), out var exit))
+            var maximumExitDistance = SourceUnits.ToMeters(128f);
+            if (!TryCastExit(entry, direction, maximumExitDistance, out var exit))
             {
                 stopped = true;
                 break;
             }
             var thicknessInches = SourceUnits.ToSource(Vector3.Distance(entry.Position, exit.Position));
+            var exitIsGrate = (exit.Contents & SourceContents.Grate) != 0;
+            var hitGrate = entryIsGrate && exitIsGrate;
+            if (state.PenetrationsRemaining == 0 && !hitGrate)
+            {
+                stopped = true;
+                break;
+            }
+            if (state.PenetrationsRemaining < 0)
+            {
+                stopped = true;
+                break;
+            }
             var penetration = SourceCounterStrikePenetration.TryPenetrate(in state,
                 materialResolver(entry), materialResolver(exit), thicknessInches,
-                (entry.Contents & SourceContents.Grate) != 0, 1f);
+                hitGrate, 1f);
             if (!penetration.Success)
             {
                 stopped = true;
@@ -248,7 +272,8 @@ public sealed class JoltHitscanQueries : IDisposable
             }
             state = penetration.State;
             impacts.Add(new(exit, true, state.Damage));
-            distanceTravelled += Vector3.Distance(currentStart, exit.Position) + SourceUnits.ToMeters(0.001f);
+            traceDistance = MathF.Max(0f,
+                (traceDistance - SourceUnits.ToMeters(state.CurrentDistance)) * 0.5f);
             currentStart = exit.Position + direction * SourceUnits.ToMeters(0.001f);
         }
         return new(impacts, state, stopped);
