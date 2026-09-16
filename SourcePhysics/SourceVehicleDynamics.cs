@@ -206,6 +206,22 @@ public static class SourceVehicleDynamics
         float gravityLength, float bodyMass) =>
         MathF.Abs(bodyUpY) < 0.05f ? tiltForce * gravityLength * bodyMass : 0f;
 
+    /// Exact InitCarSystemBody extra-gravity force setup from
+    /// physics_vehicle.cpp: addGravity is multiplied by the environment
+    /// gravity magnitude and the vehicle body mass before being handed to
+    /// the IVP car system.
+    public static float ComputeExtraGravityForce(float addGravity,
+        float gravityLengthMetersPerSecondSquared, float bodyMassKg)
+    {
+        if (!float.IsFinite(addGravity) || addGravity < 0f)
+            throw new ArgumentOutOfRangeException(nameof(addGravity));
+        if (!float.IsFinite(gravityLengthMetersPerSecondSquared) || gravityLengthMetersPerSecondSquared < 0f)
+            throw new ArgumentOutOfRangeException(nameof(gravityLengthMetersPerSecondSquared));
+        if (!float.IsFinite(bodyMassKg) || bodyMassKg < 0f)
+            throw new ArgumentOutOfRangeException(nameof(bodyMassKg));
+        return addGravity * gravityLengthMetersPerSecondSquared * bodyMassKg;
+    }
+
     /// Source's post-controller angular velocity limit, preserving direction.
     public static Vector3 ClampAngularVelocity(Vector3 angularVelocity,
         float maximumAngularVelocityRadiansPerSecond)

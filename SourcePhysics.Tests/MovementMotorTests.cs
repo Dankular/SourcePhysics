@@ -2871,6 +2871,14 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceVehicleExtraGravityForceMatchesInitCarSystemBody()
+    {
+        Assert.Equal(1962f, SourceVehicleDynamics.ComputeExtraGravityForce(2f, 9.81f, 100f), 3);
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            SourceVehicleDynamics.ComputeExtraGravityForce(-1f, 9.81f, 100f));
+    }
+
+    [Fact]
     public void SourcePushawayPolicyMatchesSourceForceClampAndSpeedGate()
     {
         var profile = new SourcePushawayProfile();
