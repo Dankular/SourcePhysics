@@ -147,8 +147,8 @@ public sealed class JoltHitscanWeapon : SyncScript
             throw new ArgumentOutOfRangeException(nameof(info), "Damage must be non-negative and finite.");
         if (!float.IsFinite(info.DamageForceScale) || info.DamageForceScale < 0f)
             throw new ArgumentOutOfRangeException(nameof(info), "Damage force scale must be non-negative and finite.");
-        if (!float.IsFinite(PhysicsPushScale) || PhysicsPushScale < 0f)
-            throw new InvalidOperationException("PhysicsPushScale must be finite and non-negative.");
+        if (!float.IsFinite(PhysicsPushScale))
+            throw new InvalidOperationException("PhysicsPushScale must be finite.");
         var query = queries ?? throw new InvalidOperationException("The weapon must be started before firing.");
         var ammoDefinition = AmmoDefinitionResolver?.Invoke(info.AmmoType);
         var resolvedPlayerDamage = info.PlayerDamage;
