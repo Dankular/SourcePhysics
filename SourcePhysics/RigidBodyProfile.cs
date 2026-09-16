@@ -5,6 +5,11 @@ public sealed record SourceRigidBodyProfile
     public float MassKg { get; init; } = 1f;
     public System.Numerics.Vector3 CenterOfMassOffsetMeters { get; init; }
     public float InertiaScale { get; init; } = 1f;
+    /// Source objectparams_t::pName. Source uses this for physics debugging.
+    public string Name { get; init; } = "";
+    /// Source objectparams_t::volume, in cubic Source inches. Zero preserves
+    /// Source's default buoyancy ratio of one.
+    public float VolumeCubicInches { get; init; }
     public float LinearDampingPerSecond { get; init; } = 0.05f;
     public float AngularDampingPerSecond { get; init; } = 0.05f;
     public bool EnableDrag { get; init; }
@@ -50,7 +55,7 @@ public sealed record SourceRigidBodyProfile
             MassKg, InertiaScale, LinearDampingPerSecond, AngularDampingPerSecond,
             DragCoefficientPerSecond, RollingDragCoefficientPerSecond, GravityFactor,
             MaxLinearVelocityMetersPerSecond, MaxAngularVelocityRadiansPerSecond,
-            Friction, Restitution, BuoyancyRatio
+            Friction, Restitution, BuoyancyRatio, VolumeCubicInches
         };
         if (scalars.Any(value => !float.IsFinite(value)))
             throw new InvalidDataException("Rigid-body profile contains a non-finite value.");
@@ -62,6 +67,8 @@ public sealed record SourceRigidBodyProfile
             throw new InvalidDataException("Rigid-body profile contains an invalid negative or zero-required value.");
         if (BuoyancyRatio < 0f)
             throw new InvalidDataException("Rigid-body buoyancy ratio cannot be negative.");
+        if (VolumeCubicInches < 0f)
+            throw new InvalidDataException("Rigid-body volume cannot be negative.");
         if (!float.IsFinite(CenterOfMassOffsetMeters.X) || !float.IsFinite(CenterOfMassOffsetMeters.Y) || !float.IsFinite(CenterOfMassOffsetMeters.Z))
             throw new InvalidDataException("Rigid-body center-of-mass offset must be finite.");
     }

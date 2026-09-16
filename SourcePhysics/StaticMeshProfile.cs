@@ -4,6 +4,10 @@ public sealed record SourceStaticMeshProfile
 {
     public float Friction { get; init; } = 0.8f;
     public float Restitution { get; init; } = 0.001f;
+    /// Source objectparams_t::pName, retained for authored physics diagnostics.
+    public string Name { get; init; } = "";
+    /// Source objectparams_t::volume, in cubic Source inches.
+    public float VolumeCubicInches { get; init; }
     /// Source objectparams_t::enableCollisions for the static/poly body.
     public bool EnableCollisions { get; init; } = true;
     public float ActiveEdgeCosThresholdAngle { get; init; } = 0.996f;
@@ -40,6 +44,8 @@ public sealed record SourceStaticMeshProfile
             throw new InvalidDataException("Static mesh friction must be finite and non-negative.");
         if (!float.IsFinite(Restitution) || Restitution < 0f)
             throw new InvalidDataException("Static mesh restitution must be finite and non-negative.");
+        if (!float.IsFinite(VolumeCubicInches) || VolumeCubicInches < 0f)
+            throw new InvalidDataException("Static mesh volume must be finite and non-negative.");
         if (!float.IsFinite(ActiveEdgeCosThresholdAngle) || ActiveEdgeCosThresholdAngle < -1f || ActiveEdgeCosThresholdAngle > 1f)
             throw new InvalidDataException("Static mesh active-edge cosine threshold must be in [-1, 1].");
         if (MaxTrianglesPerLeaf == 0)

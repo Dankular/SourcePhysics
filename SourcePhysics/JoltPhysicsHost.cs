@@ -193,56 +193,57 @@ public sealed partial class JoltPhysicsHost : IDisposable
     {
         if (!initialized) throw new InvalidOperationException("Initialize the Jolt host before creating bodies.");
         profile.Validate();
+        var effectiveProfile = ApplySourceVolumeBuoyancy(profile, surfaceId);
         using var boxShape = new BoxShape(halfExtent, 0.001f);
         OffsetCenterOfMassShape? offsetShape = null;
         Shape shape = boxShape;
-        if (profile.CenterOfMassOffsetMeters.LengthSquared() > 1e-12f)
+        if (effectiveProfile.CenterOfMassOffsetMeters.LengthSquared() > 1e-12f)
         {
-            var centerOfMassOffset = profile.CenterOfMassOffsetMeters;
+            var centerOfMassOffset = effectiveProfile.CenterOfMassOffsetMeters;
             offsetShape = new OffsetCenterOfMassShape(in centerOfMassOffset, boxShape);
             shape = offsetShape;
         }
         RVector3 precisePosition = position;
-        var effectiveLayer = GetEffectiveLayer(layer, profile.SolidFlags, profile.EnableCollisions);
-        var effectiveCollisionGroup = GetEffectiveCollisionGroup(effectiveLayer, profile.CollisionGroup);
-        var effectiveSolidFlags = profile.SolidFlags |
+        var effectiveLayer = GetEffectiveLayer(layer, effectiveProfile.SolidFlags, effectiveProfile.EnableCollisions);
+        var effectiveCollisionGroup = GetEffectiveCollisionGroup(effectiveLayer, effectiveProfile.CollisionGroup);
+        var effectiveSolidFlags = effectiveProfile.SolidFlags |
             (effectiveLayer == SourceObjectLayer.Trigger ? SourceSolidFlags.Trigger : SourceSolidFlags.None) |
-            (profile.TriggerTouchesDebris ? SourceSolidFlags.TriggerTouchDebris : SourceSolidFlags.None);
+            (effectiveProfile.TriggerTouchesDebris ? SourceSolidFlags.TriggerTouchDebris : SourceSolidFlags.None);
         var isTrigger = effectiveLayer == SourceObjectLayer.Trigger;
         using var settings = new BodyCreationSettings(shape, precisePosition, rotation, motionType, new ObjectLayer((ushort)effectiveLayer))
         {
-            Friction = profile.Friction,
-            Restitution = profile.Restitution,
-            LinearDamping = profile.LinearDampingPerSecond,
-            AngularDamping = profile.AngularDampingPerSecond,
-            GravityFactor = profile.GravityFactor,
-            MaxLinearVelocity = profile.MaxLinearVelocityMetersPerSecond,
-            MaxAngularVelocity = profile.MaxAngularVelocityRadiansPerSecond,
-            InertiaMultiplier = profile.InertiaScale,
-            MotionQuality = profile.ContinuousCollision ? MotionQuality.LinearCast : MotionQuality.Discrete,
-            AllowSleeping = profile.AllowSleep,
+            Friction = effectiveProfile.Friction,
+            Restitution = effectiveProfile.Restitution,
+            LinearDamping = effectiveProfile.LinearDampingPerSecond,
+            AngularDamping = effectiveProfile.AngularDampingPerSecond,
+            GravityFactor = effectiveProfile.GravityFactor,
+            MaxLinearVelocity = effectiveProfile.MaxLinearVelocityMetersPerSecond,
+            MaxAngularVelocity = effectiveProfile.MaxAngularVelocityRadiansPerSecond,
+            InertiaMultiplier = effectiveProfile.InertiaScale,
+            MotionQuality = effectiveProfile.ContinuousCollision ? MotionQuality.LinearCast : MotionQuality.Discrete,
+            AllowSleeping = effectiveProfile.AllowSleep,
             IsSensor = isTrigger,
             OverrideMassProperties = OverrideMassProperties.MassAndInertiaProvided
         };
         var massProperties = settings.MassPropertiesOverride;
-        massProperties.SetMassAndInertiaOfSolidBox(halfExtent * 2f, profile.MassKg);
+        massProperties.SetMassAndInertiaOfSolidBox(halfExtent * 2f, effectiveProfile.MassKg);
         settings.MassPropertiesOverride = massProperties;
         var id = Bodies.CreateAndAddBody(settings, motionType == MotionType.Static ? Activation.DontActivate : Activation.Activate);
         offsetShape?.Dispose();
         if (!id.IsValid) throw new InvalidOperationException("Jolt rejected body creation.");
-        Bodies.SetFriction(id, profile.Friction);
-        Bodies.SetRestitution(id, profile.Restitution);
-        Bodies.SetUserData(id, profile.UserData);
+        Bodies.SetFriction(id, effectiveProfile.Friction);
+        Bodies.SetRestitution(id, effectiveProfile.Restitution);
+        Bodies.SetUserData(id, effectiveProfile.UserData);
         ownedBodies.Add(id);
         if (motionType == MotionType.Static) staticBodies.Add(id.ID);
         bodySurfaces[id.ID] = surfaceId;
-        bodyProfiles[id.ID] = profile;
-        bodyContents[id.ID] = profile.ContentsMask;
+        bodyProfiles[id.ID] = effectiveProfile;
+        bodyContents[id.ID] = effectiveProfile.ContentsMask;
         bodyLayers[id.ID] = effectiveLayer;
         bodyRequestedLayers[id.ID] = layer;
         bodySolidFlags[id.ID] = effectiveSolidFlags;
         bodyCollisionGroups[id.ID] = effectiveCollisionGroup;
-        bodyCollisionEnabled[id.ID] = profile.EnableCollisions;
+        bodyCollisionEnabled[id.ID] = effectiveProfile.EnableCollisions;
         if ((effectiveSolidFlags & SourceSolidFlags.NotSolid) != 0 && !isTrigger)
             nonSolidBodies.Add(id.ID);
         if (isTrigger)
@@ -252,6 +253,18 @@ public sealed partial class JoltPhysicsHost : IDisposable
                 triggerTouchesDebris.Add(id.ID);
         }
         return id;
+    }
+
+    private SourceRigidBodyProfile ApplySourceVolumeBuoyancy(SourceRigidBodyProfile profile, int surfaceId)
+    {
+        // Source stores the authored volume, then clamps only the volume used to
+        // calculate density. The authored value remains observable through GetVolume.
+        if (profile.VolumeCubicInches <= 0f) return profile;
+        var effectiveVolumeCubicInches = MathF.Max(5f, profile.VolumeCubicInches);
+        var volumeCubicMeters = effectiveVolumeCubicInches * MathF.Pow(SourceUnits.InchesToMeters, 3f);
+        var materialDensity = Surfaces.Get(surfaceId).DensityKgPerM3;
+        var buoyancyRatio = (profile.MassKg / volumeCubicMeters) / materialDensity;
+        return profile with { BuoyancyRatio = buoyancyRatio };
     }
 
     public BodyID CreateStaticMeshBody(IReadOnlyList<Vector3> vertices, IReadOnlyList<IndexedTriangle> triangles,
@@ -317,7 +330,15 @@ public sealed partial class JoltPhysicsHost : IDisposable
         {
             Friction = profile.Friction,
             Restitution = profile.Restitution,
-            CallbackFlags = profile.CallbackFlags
+            CallbackFlags = profile.CallbackFlags,
+            Name = profile.Name,
+            VolumeCubicInches = profile.VolumeCubicInches,
+            EnableCollisions = profile.EnableCollisions,
+            ContentsMask = profile.ContentsMask,
+            SolidFlags = profile.SolidFlags,
+            CollisionGroup = profile.CollisionGroup,
+            TriggerTouchesDebris = profile.TriggerTouchesDebris,
+            UserData = profile.UserData
         };
         bodyContents[id.ID] = profile.ContentsMask;
         bodyLayers[id.ID] = effectiveLayer;
@@ -394,6 +415,10 @@ public sealed partial class JoltPhysicsHost : IDisposable
     }
     public float GetBodyBuoyancyRatio(BodyID id) =>
         bodyProfiles.TryGetValue(id.ID, out var profile) ? profile.BuoyancyRatio : 1f;
+    public float GetBodyVolume(BodyID id) =>
+        bodyProfiles.TryGetValue(id.ID, out var profile) ? profile.VolumeCubicInches : 0f;
+    public string GetBodyName(BodyID id) =>
+        bodyProfiles.TryGetValue(id.ID, out var profile) ? profile.Name : "";
     public bool IsFluidSimulationEnabled(BodyID id) =>
         !bodyProfiles.TryGetValue(id.ID, out var profile) ||
         (profile.CallbackFlags & SourceCallbackFlags.DoFluidSimulation) != 0;

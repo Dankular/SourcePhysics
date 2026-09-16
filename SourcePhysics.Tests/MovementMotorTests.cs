@@ -2880,6 +2880,28 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceObjectParamsVolumeUsesFiveCubicInchMinimumAndRetainsAuthoredMetadata()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize();
+        host.Surfaces.Register(44, new SourceSurface("dense", DensityKgPerM3: 2000f));
+        var body = host.CreateBoxBody(new(0.25f), Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                MassKg = 2f,
+                BuoyancyRatio = 0.35f,
+                VolumeCubicInches = 1f,
+                Name = "crate"
+            }, 44);
+
+        var minimumVolumeCubicMeters = 5f * MathF.Pow(SourceUnits.InchesToMeters, 3f);
+        var expectedRatio = (2f / minimumVolumeCubicMeters) / 2000f;
+        Assert.Equal(expectedRatio, host.GetBodyBuoyancyRatio(body), 5);
+        Assert.Equal(1f, host.GetBodyVolume(body));
+        Assert.Equal("crate", host.GetBodyName(body));
+    }
+
+    [Fact]
     public void SourceFluidProfileUsesReferencedDefaultTorqueFactor()
     {
         var profile = new SourceFluidProfile();
