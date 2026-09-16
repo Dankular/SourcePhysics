@@ -554,6 +554,7 @@ public sealed class MovementMotorTests
         recording.Capture(13);
         var withContacts = SourcePhysicsRecordingArtifact.FromJson(recording.ToJson());
         Assert.NotEmpty(withContacts.Frames[1].Contacts);
+        Assert.NotEmpty(withContacts.Frames[1].Collisions ?? Array.Empty<SourcePhysicsCollisionFrame>());
     }
 
     [Fact]

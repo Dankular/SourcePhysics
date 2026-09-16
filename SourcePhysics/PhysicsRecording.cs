@@ -12,6 +12,13 @@ public readonly record struct SourcePhysicsContactFrame(
     bool Persisted,
     bool Removed);
 
+public readonly record struct SourcePhysicsCollisionFrame(
+    uint BodyA,
+    uint BodyB,
+    Vector3 ContactPoint,
+    Vector3 Normal,
+    float PenetrationDepth);
+
 public readonly record struct SourcePhysicsImpulseFrame(
     uint BodyId,
     Vector3 Impulse,
@@ -22,7 +29,8 @@ public sealed record SourcePhysicsTickFrame(
     int Tick,
     SourcePhysicsBodySnapshot[] Bodies,
     SourcePhysicsContactFrame[] Contacts,
-    SourcePhysicsImpulseFrame[] Impulses);
+    SourcePhysicsImpulseFrame[] Impulses,
+    SourcePhysicsCollisionFrame[]? Collisions = null);
 
 /// Fixed-tick rigid-body differential recording. Contact frames describe the
 /// Jolt event stream; impulse frames describe explicit gameplay impulses sent
@@ -32,6 +40,7 @@ public sealed class SourcePhysicsRecording : IDisposable
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true, IncludeFields = true };
     private readonly JoltPhysicsHost host;
     private readonly List<SourcePhysicsContactFrame> pendingContacts = new();
+    private readonly List<SourcePhysicsCollisionFrame> pendingCollisions = new();
     private readonly List<SourcePhysicsImpulseFrame> pendingImpulses = new();
     private bool disposed;
 
@@ -44,6 +53,7 @@ public sealed class SourcePhysicsRecording : IDisposable
         host.Contacts.ContactAdded += OnContactAdded;
         host.Contacts.ContactPersisted += OnContactPersisted;
         host.Contacts.ContactRemoved += OnContactRemoved;
+        host.Contacts.CollisionStarted += OnCollisionStarted;
         host.ImpulseApplied += OnImpulseApplied;
     }
 
@@ -51,8 +61,9 @@ public sealed class SourcePhysicsRecording : IDisposable
     {
         ThrowIfDisposed();
         Frames.Add(new SourcePhysicsTickFrame(tick, host.CaptureState(tick).Bodies,
-            pendingContacts.ToArray(), pendingImpulses.ToArray()));
+            pendingContacts.ToArray(), pendingImpulses.ToArray(), pendingCollisions.ToArray()));
         pendingContacts.Clear();
+        pendingCollisions.Clear();
         pendingImpulses.Clear();
     }
 
@@ -64,6 +75,7 @@ public sealed class SourcePhysicsRecording : IDisposable
         host.Contacts.ContactAdded -= OnContactAdded;
         host.Contacts.ContactPersisted -= OnContactPersisted;
         host.Contacts.ContactRemoved -= OnContactRemoved;
+        host.Contacts.CollisionStarted -= OnCollisionStarted;
         host.ImpulseApplied -= OnImpulseApplied;
         disposed = true;
     }
@@ -76,6 +88,9 @@ public sealed class SourcePhysicsRecording : IDisposable
 
     private void OnContactRemoved(SourceContactRemovedEvent value) => pendingContacts.Add(new(value.BodyA, value.BodyB,
         default, default, 0f, false, true));
+
+    private void OnCollisionStarted(SourceCollisionEvent value) => pendingCollisions.Add(new(value.BodyA, value.BodyB,
+        value.ContactPoint, value.Normal, value.PenetrationDepth));
 
     private void OnImpulseApplied(SourcePhysicsImpulseEvent value) => pendingImpulses.Add(
         new(value.BodyId, value.Impulse, value.WorldPoint, value.AtPoint));
@@ -158,6 +173,9 @@ public static class SourcePhysicsRecordingComparator
             errors.AddRange(world.Errors.Select(error => $"frame:{left.Tick}:{error}"));
             if (!left.Contacts.SequenceEqual(right.Contacts)) errors.Add($"contacts:{left.Tick}");
             if (!left.Impulses.SequenceEqual(right.Impulses)) errors.Add($"impulses:{left.Tick}");
+            if (!((left.Collisions ?? Array.Empty<SourcePhysicsCollisionFrame>()).SequenceEqual(
+                    right.Collisions ?? Array.Empty<SourcePhysicsCollisionFrame>())))
+                errors.Add($"collisions:{left.Tick}");
         }
         var divisor = Math.Max(1, comparedBodyCount);
         return new(timing, positionMaximum, rotationMaximum, linearMaximum, angularMaximum, errors,
