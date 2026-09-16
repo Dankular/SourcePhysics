@@ -99,5 +99,6 @@ public sealed class JoltVehicleWheelQueriesTests
         Assert.Equal((int)platform.ID, contact.BodyId);
         var velocity = queries.GetContactBodyPointVelocity(in contact);
         Assert.Equal(SourceUnits.ToMeters(60f), velocity.X, 3);
+        Assert.Equal(velocity, contact.SurfaceVelocityMetersPerSecond);
     }
 }

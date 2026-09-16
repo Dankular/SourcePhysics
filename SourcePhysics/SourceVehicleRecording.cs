@@ -196,6 +196,9 @@ public static class SourceVehicleRecordingComparator
             "suspension-length", tolerance, ref maximum, ref sum, ref samples, errors);
         CompareNumeric(tick, wheel, a.SurfaceFriction, b.SurfaceFriction, "surface-friction",
             tolerance, ref maximum, ref sum, ref samples, errors);
+        CompareVector(tick, wheel, a.SurfaceVelocityMetersPerSecond,
+            b.SurfaceVelocityMetersPerSecond, "surface-velocity", tolerance,
+            ref maximum, ref sum, ref samples, errors);
     }
 
     private static void CompareVector(int tick, int wheel, Vector3 a, Vector3 b, string field,

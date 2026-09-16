@@ -54,8 +54,10 @@ public sealed class JoltVehicleWheelQueries
                 if (queries.Cast(start, vehicleDown, lengthMeters, out var hit))
                 {
                     var surface = host.Surfaces.Get(hit.SurfaceId);
+                    var bodyId = hit.BodyId;
                     contacts[wheelIndex] = new(true, hit.Position, hit.Normal,
-                        hit.Fraction * lengthMeters, hit.SurfaceId, surface.Friction, hit.BodyId);
+                        hit.Fraction * lengthMeters, hit.SurfaceId, surface.Friction, bodyId,
+                        GetBodyPointVelocity(bodyId, hit.Position));
                 }
                 else
                 {
@@ -76,14 +78,21 @@ public sealed class JoltVehicleWheelQueries
         var bodyId = new BodyID(unchecked((uint)contact.BodyId));
         if (!host.Bodies.IsAdded(bodyId))
             return Vector3.Zero;
-        var contactPoint = contact.ContactPointMeters;
+        return GetBodyPointVelocity(contact.BodyId, contact.ContactPointMeters);
+    }
+
+    private Vector3 GetBodyPointVelocity(int bodyIdValue, Vector3 contactPoint)
+    {
+        var bodyId = new BodyID(unchecked((uint)bodyIdValue));
+        if (!host.Bodies.IsAdded(bodyId))
+            return Vector3.Zero;
         host.Bodies.GetPointVelocity(in bodyId, in contactPoint, out var velocity);
         if (velocity.LengthSquared() < 1e-12f)
         {
             var angular = host.Bodies.GetAngularVelocity(bodyId);
             var center = (Vector3)host.Bodies.GetRCenterOfMassPosition(bodyId);
             velocity = host.Bodies.GetLinearVelocity(bodyId) +
-                Vector3.Cross(angular, contact.ContactPointMeters - center);
+                Vector3.Cross(angular, contactPoint - center);
         }
         return velocity;
     }

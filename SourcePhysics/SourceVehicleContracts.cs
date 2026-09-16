@@ -249,7 +249,9 @@ public readonly record struct SourceVehicleWheelContact(
     int SurfaceId,
     float SurfaceFriction,
     /// Jolt body identity for moving-platform velocity and exact contact routing.
-    int BodyId = -1);
+    int BodyId = -1,
+    /// Contacted-body point velocity in Jolt metres per second.
+    Vector3 SurfaceVelocityMetersPerSecond = default);
 
 public readonly record struct SourceVehicleWheelSkidSample(
     bool InContact,
