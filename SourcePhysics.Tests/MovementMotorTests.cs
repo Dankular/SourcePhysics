@@ -527,6 +527,10 @@ public sealed class MovementMotorTests
         var frame = Assert.Single(artifact.Frames);
         Assert.Equal(12, frame.Tick);
         Assert.Equal((ulong)77, frame.Bodies.Single(snapshot => snapshot.State.UserData == 77).State.UserData);
+        var bodyProperties = Assert.Single(frame.Properties!, properties => properties.BodyId == body.ID);
+        Assert.Equal(1f, bodyProperties.MassKg, 5);
+        Assert.False(bodyProperties.EnableDrag);
+        Assert.Equal(0.05f, bodyProperties.LinearDampingPerSecond, 5);
         var impulse = Assert.Single(frame.Impulses);
         Assert.Equal(body.ID, impulse.BodyId);
         Assert.Equal(Vector3.UnitX, impulse.Impulse);

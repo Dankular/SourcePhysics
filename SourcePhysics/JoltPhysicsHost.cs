@@ -437,6 +437,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyProfiles.TryGetValue(id.ID, out var profile) ? profile.VolumeCubicInches : 0f;
     public string GetBodyName(BodyID id) =>
         bodyProfiles.TryGetValue(id.ID, out var profile) ? profile.Name : "";
+    public bool TryGetBodyProfile(BodyID id, out SourceRigidBodyProfile profile) =>
+        bodyProfiles.TryGetValue(id.ID, out profile!);
     public bool IsFluidSimulationEnabled(BodyID id) =>
         !bodyProfiles.TryGetValue(id.ID, out var profile) ||
         (profile.CallbackFlags & SourceCallbackFlags.DoFluidSimulation) != 0;

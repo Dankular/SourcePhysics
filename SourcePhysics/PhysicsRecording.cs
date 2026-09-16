@@ -33,13 +33,27 @@ public readonly record struct SourcePhysicsImpulseFrame(
     Vector3 WorldPoint,
     bool AtPoint);
 
+public readonly record struct SourcePhysicsBodyPropertiesFrame(
+    uint BodyId,
+    float MassKg,
+    float InertiaScale,
+    float LinearDampingPerSecond,
+    float AngularDampingPerSecond,
+    bool EnableDrag,
+    float DragCoefficientPerSecond,
+    float RollingDragCoefficientPerSecond,
+    float BuoyancyRatio,
+    float VolumeCubicInches,
+    string Name);
+
 public sealed record SourcePhysicsTickFrame(
     int Tick,
     SourcePhysicsBodySnapshot[] Bodies,
     SourcePhysicsContactFrame[] Contacts,
     SourcePhysicsImpulseFrame[] Impulses,
     SourcePhysicsCollisionFrame[]? Collisions = null,
-    SourcePhysicsTriggerFrame[]? Triggers = null);
+    SourcePhysicsTriggerFrame[]? Triggers = null,
+    SourcePhysicsBodyPropertiesFrame[]? Properties = null);
 
 /// Fixed-tick rigid-body differential recording. Contact frames describe the
 /// Jolt event stream; impulse frames describe explicit gameplay impulses sent
@@ -73,8 +87,22 @@ public sealed class SourcePhysicsRecording : IDisposable
     public void Capture(int tick)
     {
         ThrowIfDisposed();
-        Frames.Add(new SourcePhysicsTickFrame(tick, host.CaptureState(tick).Bodies,
-            pendingContacts.ToArray(), pendingImpulses.ToArray(), pendingCollisions.ToArray(), pendingTriggers.ToArray()));
+        var state = host.CaptureState(tick);
+        var properties = state.Bodies
+            .Select(snapshot =>
+            {
+                var bodyId = new JoltPhysicsSharp.BodyID(snapshot.BodyId);
+                if (!host.TryGetBodyProfile(bodyId, out var profile))
+                    return new SourcePhysicsBodyPropertiesFrame(snapshot.BodyId, 0f, 0f, 0f, 0f, false, 0f, 0f, 1f, 0f, "");
+                var mass = host.TryGetBodyMass(bodyId, out var dynamicMass) ? dynamicMass : profile.MassKg;
+                return new SourcePhysicsBodyPropertiesFrame(snapshot.BodyId, mass, profile.InertiaScale,
+                    profile.LinearDampingPerSecond, profile.AngularDampingPerSecond, profile.EnableDrag,
+                    profile.DragCoefficientPerSecond, profile.RollingDragCoefficientPerSecond,
+                    profile.BuoyancyRatio, profile.VolumeCubicInches, profile.Name);
+            })
+            .ToArray();
+        Frames.Add(new SourcePhysicsTickFrame(tick, state.Bodies,
+            pendingContacts.ToArray(), pendingImpulses.ToArray(), pendingCollisions.ToArray(), pendingTriggers.ToArray(), properties));
         pendingContacts.Clear();
         pendingCollisions.Clear();
         pendingTriggers.Clear();
@@ -205,6 +233,9 @@ public static class SourcePhysicsRecordingComparator
             if (!((left.Triggers ?? Array.Empty<SourcePhysicsTriggerFrame>()).SequenceEqual(
                     right.Triggers ?? Array.Empty<SourcePhysicsTriggerFrame>())))
                 errors.Add($"triggers:{left.Tick}");
+            if (!((left.Properties ?? Array.Empty<SourcePhysicsBodyPropertiesFrame>()).SequenceEqual(
+                    right.Properties ?? Array.Empty<SourcePhysicsBodyPropertiesFrame>())))
+                errors.Add($"properties:{left.Tick}");
         }
         var divisor = Math.Max(1, comparedBodyCount);
         return new(timing, positionMaximum, rotationMaximum, linearMaximum, angularMaximum, errors,
