@@ -36,4 +36,11 @@ public sealed class SourceSurfacePropertiesParserTests
         Assert.Throws<InvalidDataException>(() => SourceSurfaceRegistry.FromSurfaceProperties(
             "surfaceproperties { \"a\" { \"base\" \"b\" } \"b\" { \"base\" \"a\" } }"));
     }
+
+    [Fact]
+    public void ParserRejectsNestedSurfaceBlocksInsteadOfDiscardingThem()
+    {
+        Assert.Throws<InvalidDataException>(() => SourceSurfaceRegistry.FromSurfaceProperties(
+            "surfaceproperties { \"metal\" { \"friction\" \"0.5\" \"unhandled\" { \"value\" \"1\" } } }"));
+    }
 }

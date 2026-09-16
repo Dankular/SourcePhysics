@@ -30,6 +30,8 @@ internal static class SourceSurfacePropertiesParser
 
         var surfaceBlocks = roots.SelectMany(root => root.Name.Equals("surfaceproperties", StringComparison.OrdinalIgnoreCase)
             ? root.Children : (IEnumerable<Block>)new[] { root }).ToArray();
+        if (surfaceBlocks.Any(block => block.Children.Count != 0))
+            throw new InvalidDataException("Nested blocks inside a Source surface are unsupported and would discard authored data.");
         var byName = surfaceBlocks.ToDictionary(block => block.Name, StringComparer.OrdinalIgnoreCase);
         var resolved = new Dictionary<string, SourceSurface>(StringComparer.OrdinalIgnoreCase);
         var resolving = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
