@@ -2962,6 +2962,31 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceSetDragCoefficientUpdatesIndependentChannelsAndEnableState()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize();
+        var body = host.CreateBoxBody(new(0.5f), Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                EnableDrag = true, DragCoefficientPerSecond = 2f, RollingDragCoefficientPerSecond = 3f,
+                GravityFactor = 0f, LinearDampingPerSecond = 0f, AngularDampingPerSecond = 0f
+            });
+
+        host.SetBodyDragCoefficient(body, 0f, null);
+        host.Bodies.SetLinearVelocity(body, Vector3.UnitX);
+        host.Bodies.SetAngularVelocity(body, Vector3.UnitY);
+        host.Step();
+        Assert.Equal(1f, host.Bodies.GetLinearVelocity(body).X, 5);
+        Assert.True(host.Bodies.GetAngularVelocity(body).Y < 1f);
+
+        host.SetBodyDragCoefficient(body, null, 0f);
+        host.Bodies.SetLinearVelocity(body, Vector3.UnitX);
+        host.Step();
+        Assert.Equal(1f, host.Bodies.GetLinearVelocity(body).X, 5);
+    }
+
+    [Fact]
     public void SourceFluidProfileUsesReferencedDefaultTorqueFactor()
     {
         var profile = new SourceFluidProfile();

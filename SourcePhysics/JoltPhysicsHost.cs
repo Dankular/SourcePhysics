@@ -563,6 +563,41 @@ public sealed partial class JoltPhysicsHost : IDisposable
         }
     }
 
+    /// <summary>Applies Source CPhysicsObject::SetDragCoefficient semantics.</summary>
+    public void SetBodyDragCoefficient(BodyID bodyId, float? linearCoefficient, float? angularCoefficient)
+    {
+        EnsureDynamicBody(bodyId);
+        if (linearCoefficient is { } linear && (!float.IsFinite(linear) || linear < 0f))
+            throw new ArgumentOutOfRangeException(nameof(linearCoefficient));
+        if (angularCoefficient is { } angular && (!float.IsFinite(angular) || angular < 0f))
+            throw new ArgumentOutOfRangeException(nameof(angularCoefficient));
+        if (!bodyProfiles.TryGetValue(bodyId.ID, out var profile) ||
+            !bodyHalfExtents.TryGetValue(bodyId.ID, out var halfExtent))
+            throw new InvalidOperationException("Body has no Source box profile.");
+
+        var updatedProfile = profile with
+        {
+            DragCoefficientPerSecond = linearCoefficient ?? profile.DragCoefficientPerSecond,
+            RollingDragCoefficientPerSecond = angularCoefficient ?? profile.RollingDragCoefficientPerSecond
+        };
+        updatedProfile = updatedProfile with
+        {
+            EnableDrag = updatedProfile.DragCoefficientPerSecond != 0f ||
+                updatedProfile.RollingDragCoefficientPerSecond != 0f
+        };
+        bodyProfiles[bodyId.ID] = updatedProfile;
+        if (updatedProfile.EnableDrag)
+        {
+            bodyDragBases[bodyId.ID] = SourceDragLaw.CreateBoxBasis(halfExtent, updatedProfile.MassKg,
+                updatedProfile.InertiaScale, updatedProfile.DragCoefficientPerSecond,
+                updatedProfile.RollingDragCoefficientPerSecond);
+        }
+        else
+        {
+            bodyDragBases.Remove(bodyId.ID);
+        }
+    }
+
     public void MoveKinematic(BodyID bodyId, Vector3 targetPosition, Quaternion targetRotation, float deltaSeconds)
     {
         if (!initialized || !bodyId.IsValid || !Bodies.IsAdded(bodyId))
