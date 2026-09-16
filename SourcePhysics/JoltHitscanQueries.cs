@@ -107,6 +107,48 @@ public sealed class JoltHitscanQueries : IDisposable
         return results.Select(result => ResolveHit(start, direction, distance, result)).ToArray();
     }
 
+    /// Source CBaseEntity::FireBullets uses an axis-aligned +/-3 Source-unit
+    /// hull for alternating player shotgun pellets. The hull is translated
+    /// along the shot vector; it is not rotated to the shot direction.
+    public bool CastHull(Vector3 start, Vector3 end, Vector3 halfExtentsSourceUnits,
+        out HitscanHit hit)
+    {
+        if (!IsFinite(start) || !IsFinite(end) || !IsFinite(halfExtentsSourceUnits) ||
+            halfExtentsSourceUnits.X <= 0f || halfExtentsSourceUnits.Y <= 0f ||
+            halfExtentsSourceUnits.Z <= 0f)
+            throw new ArgumentOutOfRangeException(nameof(halfExtentsSourceUnits));
+        var displacement = end - start;
+        if (displacement.LengthSquared() < 1e-12f)
+        {
+            hit = default;
+            return false;
+        }
+
+        using var shape = new BoxShape(SourceUnits.ToMeters(halfExtentsSourceUnits), 0.001f);
+        var transform = (RMatrix4x4)Matrix4x4.CreateTranslation(start);
+        var results = new List<ShapeCastResult>();
+        using var broadPhaseFilter = new AllBroadPhaseFilter();
+        using var objectLayerFilter = new AllObjectLayerFilter();
+        using var bodyFilter = new AllBodyFilter(host, includeSensors, contentsMask, ignoredBodyId, queryCollisionGroup);
+        host.NarrowPhase.CastShape(shape, transform, displacement, RVector3.Zero,
+            CollisionCollectorType.AllHitSorted, results, broadPhaseFilter, objectLayerFilter, bodyFilter, null!);
+        if (results.Count == 0)
+        {
+            hit = default;
+            return false;
+        }
+
+        var result = results[0];
+        var normal = result.PenetrationAxis.LengthSquared() > 1e-8f
+            ? Vector3.Normalize(-result.PenetrationAxis)
+            : Vector3.Normalize(-displacement);
+        var surface = host.GetBodySurface(result.BodyID2, result.SubShapeID2, out var surfaceId);
+        hit = new(start + displacement * result.Fraction, normal,
+            unchecked((int)result.BodyID2.ID), surfaceId, result.Fraction,
+            Contents: host.GetBodyContents(result.BodyID2));
+        return true;
+    }
+
     /// Returns only sensor bodies intersected by the ray, in Jolt's ordered
     /// hit order. Source FireBullets dispatches shot-responsive triggers before
     /// processing the first solid impact.

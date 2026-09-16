@@ -163,6 +163,19 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void JoltHitscanHullUsesSourceThreeUnitExtents()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize();
+        host.CreateBoxBody(new(0.02f, 0.02f, 0.02f), new(0f, SourceUnits.ToMeters(2f), 2f),
+            JoltPhysicsSharp.MotionType.Static, SourceObjectLayer.World);
+        using var queries = new JoltHitscanQueries(host);
+        Assert.False(queries.Cast(Vector3.Zero, Vector3.UnitZ, 4f, out _));
+        Assert.True(queries.CastHull(Vector3.Zero, new(0f, 0f, 4f), new(3f), out var hit));
+        Assert.True(hit.Fraction > 0f && hit.Fraction < 1f);
+    }
+
+    [Fact]
     public void FireBulletsRejectsInvalidAuthoredShotInputs()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());

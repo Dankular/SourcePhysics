@@ -11,6 +11,9 @@ public sealed class JoltHitscanWeapon : SyncScript
     public readonly record struct ShotResult(bool Hit, Vector3 Direction, HitscanHit HitData);
     public StrideSourcePhysicsScript PhysicsSystem { get; set; } = null!;
     public bool IncludeSensors { get; set; }
+    /// Set by the title when this component represents a player shooter. Source
+    /// uses the player-only alternating shotgun hull path in FireBullets.
+    public bool ShooterIsPlayer { get; set; }
     public WeaponRecording? Recording { get; set; }
     public int RecordingTick { get; set; }
     public event Action<HitscanHit>? Hit;
@@ -154,7 +157,11 @@ public sealed class JoltHitscanWeapon : SyncScript
                 ? manipulator.ShotDirection
                 : manipulator.ApplySpread(info.Spread, 0f, 0f, 0f,
                     new SourceUniformRandomStream(shotSeed).RandomFloat);
-            var didHit = query.Cast(info.OriginMeters, shotDirection, info.DistanceMeters, out var hit);
+            var didHit = ShooterIsPlayer && info.Shots > 1 && (shot & 1) != 0
+                ? query.CastHull(info.OriginMeters,
+                    info.OriginMeters + shotDirection * info.DistanceMeters,
+                    new Vector3(3f), out var hit)
+                : query.Cast(info.OriginMeters, shotDirection, info.DistanceMeters, out hit);
             EmitTriggerHits(info.OriginMeters, shotDirection,
                 didHit ? info.DistanceMeters * hit.Fraction : info.DistanceMeters);
             if (didHit) RefineHitbox(info.OriginMeters, shotDirection, info.DistanceMeters, ref hit);
