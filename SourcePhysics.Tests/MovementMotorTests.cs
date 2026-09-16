@@ -558,6 +558,25 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void PhysicsRecordingCapturesSourceTriggerEvents()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize();
+        var trigger = host.CreateBoxBody(new(1f), Vector3.Zero, JoltPhysicsSharp.MotionType.Static,
+            SourceObjectLayer.Trigger);
+        host.CreateBoxBody(new(0.1f), Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic);
+        using var recording = new SourcePhysicsRecording(host);
+        host.Step();
+        recording.Capture(1);
+
+        var artifact = SourcePhysicsRecordingArtifact.FromJson(recording.ToJson());
+        var triggerFrame = Assert.Single(artifact.Frames[0].Triggers ?? Array.Empty<SourcePhysicsTriggerFrame>());
+        Assert.Equal(trigger.ID, triggerFrame.TriggerBody);
+        Assert.False(triggerFrame.Exited);
+    }
+
+    [Fact]
     public void RigidBodyStateRestoresTransformAndVelocities()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());

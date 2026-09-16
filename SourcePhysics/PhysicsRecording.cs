@@ -19,6 +19,14 @@ public readonly record struct SourcePhysicsCollisionFrame(
     Vector3 Normal,
     float PenetrationDepth);
 
+public readonly record struct SourcePhysicsTriggerFrame(
+    uint TriggerBody,
+    uint OtherBody,
+    Vector3 ContactPoint,
+    Vector3 Normal,
+    bool Persisted,
+    bool Exited);
+
 public readonly record struct SourcePhysicsImpulseFrame(
     uint BodyId,
     Vector3 Impulse,
@@ -30,7 +38,8 @@ public sealed record SourcePhysicsTickFrame(
     SourcePhysicsBodySnapshot[] Bodies,
     SourcePhysicsContactFrame[] Contacts,
     SourcePhysicsImpulseFrame[] Impulses,
-    SourcePhysicsCollisionFrame[]? Collisions = null);
+    SourcePhysicsCollisionFrame[]? Collisions = null,
+    SourcePhysicsTriggerFrame[]? Triggers = null);
 
 /// Fixed-tick rigid-body differential recording. Contact frames describe the
 /// Jolt event stream; impulse frames describe explicit gameplay impulses sent
@@ -41,6 +50,7 @@ public sealed class SourcePhysicsRecording : IDisposable
     private readonly JoltPhysicsHost host;
     private readonly List<SourcePhysicsContactFrame> pendingContacts = new();
     private readonly List<SourcePhysicsCollisionFrame> pendingCollisions = new();
+    private readonly List<SourcePhysicsTriggerFrame> pendingTriggers = new();
     private readonly List<SourcePhysicsImpulseFrame> pendingImpulses = new();
     private bool disposed;
 
@@ -54,6 +64,9 @@ public sealed class SourcePhysicsRecording : IDisposable
         host.Contacts.ContactPersisted += OnContactPersisted;
         host.Contacts.ContactRemoved += OnContactRemoved;
         host.Contacts.CollisionStarted += OnCollisionStarted;
+        host.Contacts.TriggerEntered += OnTriggerEntered;
+        host.Contacts.TriggerStayed += OnTriggerStayed;
+        host.Contacts.TriggerExited += OnTriggerExited;
         host.ImpulseApplied += OnImpulseApplied;
     }
 
@@ -61,9 +74,10 @@ public sealed class SourcePhysicsRecording : IDisposable
     {
         ThrowIfDisposed();
         Frames.Add(new SourcePhysicsTickFrame(tick, host.CaptureState(tick).Bodies,
-            pendingContacts.ToArray(), pendingImpulses.ToArray(), pendingCollisions.ToArray()));
+            pendingContacts.ToArray(), pendingImpulses.ToArray(), pendingCollisions.ToArray(), pendingTriggers.ToArray()));
         pendingContacts.Clear();
         pendingCollisions.Clear();
+        pendingTriggers.Clear();
         pendingImpulses.Clear();
     }
 
@@ -76,6 +90,9 @@ public sealed class SourcePhysicsRecording : IDisposable
         host.Contacts.ContactPersisted -= OnContactPersisted;
         host.Contacts.ContactRemoved -= OnContactRemoved;
         host.Contacts.CollisionStarted -= OnCollisionStarted;
+        host.Contacts.TriggerEntered -= OnTriggerEntered;
+        host.Contacts.TriggerStayed -= OnTriggerStayed;
+        host.Contacts.TriggerExited -= OnTriggerExited;
         host.ImpulseApplied -= OnImpulseApplied;
         disposed = true;
     }
@@ -91,6 +108,15 @@ public sealed class SourcePhysicsRecording : IDisposable
 
     private void OnCollisionStarted(SourceCollisionEvent value) => pendingCollisions.Add(new(value.BodyA, value.BodyB,
         value.ContactPoint, value.Normal, value.PenetrationDepth));
+
+    private void OnTriggerEntered(SourceTriggerEvent value) => pendingTriggers.Add(new(value.TriggerBody,
+        value.OtherBody, value.ContactPoint, value.Normal, false, false));
+
+    private void OnTriggerStayed(SourceTriggerEvent value) => pendingTriggers.Add(new(value.TriggerBody,
+        value.OtherBody, value.ContactPoint, value.Normal, true, false));
+
+    private void OnTriggerExited(SourceTriggerRemovedEvent value) => pendingTriggers.Add(new(value.TriggerBody,
+        value.OtherBody, default, default, false, true));
 
     private void OnImpulseApplied(SourcePhysicsImpulseEvent value) => pendingImpulses.Add(
         new(value.BodyId, value.Impulse, value.WorldPoint, value.AtPoint));
@@ -176,6 +202,9 @@ public static class SourcePhysicsRecordingComparator
             if (!((left.Collisions ?? Array.Empty<SourcePhysicsCollisionFrame>()).SequenceEqual(
                     right.Collisions ?? Array.Empty<SourcePhysicsCollisionFrame>())))
                 errors.Add($"collisions:{left.Tick}");
+            if (!((left.Triggers ?? Array.Empty<SourcePhysicsTriggerFrame>()).SequenceEqual(
+                    right.Triggers ?? Array.Empty<SourcePhysicsTriggerFrame>())))
+                errors.Add($"triggers:{left.Tick}");
         }
         var divisor = Math.Max(1, comparedBodyCount);
         return new(timing, positionMaximum, rotationMaximum, linearMaximum, angularMaximum, errors,
