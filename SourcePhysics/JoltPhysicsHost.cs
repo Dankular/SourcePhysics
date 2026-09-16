@@ -292,7 +292,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         };
         using var shape = settings.Create();
         RVector3 precisePosition = position;
-        var effectiveLayer = GetEffectiveLayer(layer, profile.SolidFlags);
+        var effectiveLayer = GetEffectiveLayer(layer, profile.SolidFlags, profile.EnableCollisions);
         var effectiveCollisionGroup = GetEffectiveCollisionGroup(effectiveLayer, profile.CollisionGroup);
         var effectiveSolidFlags = profile.SolidFlags |
             (effectiveLayer == SourceObjectLayer.Trigger ? SourceSolidFlags.Trigger : SourceSolidFlags.None) |
@@ -324,7 +324,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyRequestedLayers[id.ID] = layer;
         bodySolidFlags[id.ID] = effectiveSolidFlags;
         bodyCollisionGroups[id.ID] = effectiveCollisionGroup;
-        bodyCollisionEnabled[id.ID] = true;
+        bodyCollisionEnabled[id.ID] = profile.EnableCollisions;
         if ((effectiveSolidFlags & SourceSolidFlags.NotSolid) != 0 && !isTrigger)
             nonSolidBodies.Add(id.ID);
         if (profile.TriangleSurfaceIds is not null) perTriangleSurfaceBodies.Add(id.ID);

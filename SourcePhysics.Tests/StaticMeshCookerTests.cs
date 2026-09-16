@@ -29,6 +29,7 @@ public sealed class StaticMeshCookerTests
         var profile = new SourceStaticMeshProfile
         {
             ContentsMask = SourceContents.Water,
+            EnableCollisions = false,
             CallbackFlags = SourceCallbackFlags.Default & ~SourceCallbackFlags.DoFluidSimulation,
             SolidFlags = SourceSolidFlags.NotSolid | SourceSolidFlags.Trigger,
             CollisionGroup = SourceCollisionGroup.DebrisTrigger,
@@ -39,6 +40,7 @@ public sealed class StaticMeshCookerTests
         var cooked = SourceStaticMeshCooker.Cook(vertices, new[] { Triangle(0, 1, 2) }, profile);
 
         Assert.Equal(profile.ContentsMask, cooked.Profile.ContentsMask);
+        Assert.Equal(profile.EnableCollisions, cooked.Profile.EnableCollisions);
         Assert.Equal(profile.CallbackFlags, cooked.Profile.CallbackFlags);
         Assert.Equal(profile.SolidFlags, cooked.Profile.SolidFlags);
         Assert.Equal(profile.CollisionGroup, cooked.Profile.CollisionGroup);

@@ -4,6 +4,8 @@ public sealed record SourceStaticMeshProfile
 {
     public float Friction { get; init; } = 0.8f;
     public float Restitution { get; init; } = 0.001f;
+    /// Source objectparams_t::enableCollisions for the static/poly body.
+    public bool EnableCollisions { get; init; } = true;
     public float ActiveEdgeCosThresholdAngle { get; init; } = 0.996f;
     public uint MaxTrianglesPerLeaf { get; init; } = 8;
     public int SurfaceId { get; init; }

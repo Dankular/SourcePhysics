@@ -1061,6 +1061,25 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void DisabledStaticMeshCollisionsDoNotBlockMovementOrHitscan()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(2048, 0, 2048, 256);
+        var vertices = new[]
+        {
+            new Vector3(-5, 0, -5), new Vector3(5, 0, -5),
+            new Vector3(5, 0, 5), new Vector3(-5, 0, 5)
+        };
+        host.CreateStaticMeshBody(vertices, new[] { Triangle(0, 1, 2), Triangle(0, 2, 3) }, Vector3.Zero,
+            SourceObjectLayer.World, new SourceStaticMeshProfile { EnableCollisions = false });
+        using var movement = new JoltMovementQueries(host);
+        using var hitscan = new JoltHitscanQueries(host);
+
+        Assert.Equal(-1, movement.SweepPlayer(new(0, 2, 0), new(0, -2, 0), false).BodyId);
+        Assert.False(hitscan.Cast(new(0, 2, 0), -Vector3.UnitY, 2f, out _));
+    }
+
+    [Fact]
     public void JoltStaticMeshBodyPreservesAuthoredPerTriangleSurfaceIds()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
