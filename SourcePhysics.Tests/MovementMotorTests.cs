@@ -2845,6 +2845,20 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceAirboatPontoonBuoyancyMatchesReferenceClampAndImpulseLaw()
+    {
+        var result = SourceVehicleDynamics.ComputeAirboatPontoonBuoyancy(100f, 100f, 0.02f);
+        var expectedForce = 1.6f * 0.25f * 100f * 2.8f * 0.41f * 0.0254f * 1000f;
+
+        Assert.InRange(MathF.Abs(result.Force - expectedForce), 0f, 0.001f);
+        Assert.InRange(MathF.Abs(result.Impulse - expectedForce * 0.02f), 0f, 0.001f);
+        Assert.Equal((0f, 0f),
+            SourceVehicleDynamics.ComputeAirboatPontoonBuoyancy(0f, 100f, 0.02f));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            SourceVehicleDynamics.ComputeAirboatPontoonBuoyancy(-1f, 100f, 0.02f));
+    }
+
+    [Fact]
     public void SourcePushawayPolicyMatchesSourceForceClampAndSpeedGate()
     {
         var profile = new SourcePushawayProfile();

@@ -10,6 +10,10 @@ public static class SourceVehicleDynamics
     public const float ThrottleOpposingForceEpsilonSourceUnitsPerSecond = 5f;
     public const float PowerslideSpeedThresholdSourceUnitsPerSecond = 18f;
     public const float WheelContactConeSin15Degrees = 0.2588f;
+    public const float AirboatBuoyancyScalar = 1.6f;
+    public const float AirboatPontoonAreaSquareMeters = 2.8f;
+    public const float AirboatPontoonHeightSourceUnits = 0.41f;
+    public const float AirboatPontoonCount = 4f;
     public const float MilesPerHourToMetersPerSecond = 0.44707f;
     public const float WattsPerHorsepower = 745f;
     public const float SecondsPerMinute = 60f;
@@ -230,6 +234,29 @@ public static class SourceVehicleDynamics
         var speed = Vector3.Dot(projectedSurfaceVelocity - surfaceVelocity, raycastDirection);
         force -= speed > 0f ? springDampingRelax * speed : springDampingCompression * speed;
         force = MathF.Max(0f, force);
+        return (force, force * deltaSeconds);
+    }
+
+    /// Literal CPhysics_Airboat::DoSimulationPontoonsWater law from
+    /// physics_airboat.cpp. Source obtains flDepth from a 1000-unit upward
+    /// water trace, clamps it to PONTOON_HEIGHT (0.41), converts the clamped
+    /// value with 0.0254, and distributes the buoyancy over four pontoons.
+    /// The caller applies the returned impulse along the authored world-up
+    /// direction at the pontoon impact point.
+    public static (float Force, float Impulse) ComputeAirboatPontoonBuoyancy(
+        float depthSourceUnits, float bodyMassKg, float deltaSeconds)
+    {
+        if (!float.IsFinite(depthSourceUnits) || depthSourceUnits < 0f)
+            throw new ArgumentOutOfRangeException(nameof(depthSourceUnits));
+        if (!float.IsFinite(bodyMassKg) || bodyMassKg < 0f)
+            throw new ArgumentOutOfRangeException(nameof(bodyMassKg));
+        if (!float.IsFinite(deltaSeconds) || deltaSeconds < 0f)
+            throw new ArgumentOutOfRangeException(nameof(deltaSeconds));
+
+        var depth = Math.Clamp(depthSourceUnits, 0f, AirboatPontoonHeightSourceUnits);
+        var submergedVolume = AirboatPontoonAreaSquareMeters * depth * 0.0254f;
+        var force = AirboatBuoyancyScalar * (1f / AirboatPontoonCount) * bodyMassKg *
+            submergedVolume * 1000f;
         return (force, force * deltaSeconds);
     }
 
