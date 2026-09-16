@@ -329,6 +329,9 @@ public sealed partial class JoltPhysicsHost : IDisposable
     public void SetBodySolidFlags(BodyID id, SourceSolidFlags flags)
     {
         EnsureBody(id);
+        const SourceSolidFlags supportedSolidFlags = SourceSolidFlags.NotSolid |
+            SourceSolidFlags.Trigger | SourceSolidFlags.TriggerTouchDebris;
+        if ((flags & ~supportedSolidFlags) != 0) throw new ArgumentOutOfRangeException(nameof(flags));
         if (!bodyRequestedLayers.TryGetValue(id.ID, out var requestedLayer))
             requestedLayer = SourceObjectLayer.World;
         var effectiveLayer = GetEffectiveLayer(requestedLayer, flags);
@@ -368,6 +371,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
     public void SetBodyCollisionGroup(BodyID id, SourceCollisionGroup group)
     {
         EnsureBody(id);
+        if (!Enum.IsDefined(group)) throw new ArgumentOutOfRangeException(nameof(group));
         bodyCollisionGroups[id.ID] = group;
     }
     public void SetBodyContents(BodyID id, SourceContents contents)

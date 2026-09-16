@@ -728,6 +728,20 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void RuntimeCollisionStateRejectsUnknownValues()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(1024, 0, 1024, 256);
+        var body = host.CreateBoxBody(Vector3.One, Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            host.SetBodyCollisionGroup(body, (SourceCollisionGroup)255));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            host.SetBodySolidFlags(body, (SourceSolidFlags)0x8000));
+    }
+
+    [Fact]
     public void AuthoredCollisionPolicyCanDisableAConfiguredLayerPair()
     {
         var policy = new SourceCollisionPolicy();
