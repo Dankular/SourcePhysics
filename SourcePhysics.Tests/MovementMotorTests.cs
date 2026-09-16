@@ -2864,6 +2864,13 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceVehicleWheelContactFrictionUsesReferenceFifteenDegreeCone()
+    {
+        Assert.Equal(0f, SourceVehicleDynamics.OverrideWheelContactFriction(1f, new(0.3f, 0f, 0.9539392f)));
+        Assert.Equal(1f, SourceVehicleDynamics.OverrideWheelContactFriction(1f, new(0.2f, 0f, 0.9797959f)));
+    }
+
+    [Fact]
     public void SourcePushawayPolicyMatchesSourceForceClampAndSpeedGate()
     {
         var profile = new SourcePushawayProfile();

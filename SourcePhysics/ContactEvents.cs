@@ -66,7 +66,8 @@ public sealed class SourceContactRouter
 
     internal void OnAdded(PhysicsSystem system, in Body a, in Body b, in ContactManifold manifold, ref ContactSettings settings)
     {
-        ApplySourceCombine(a, b, manifold.SubShapeID1, manifold.SubShapeID2, ref settings);
+        ApplySourceCombine(a, b, manifold.SubShapeID1, manifold.SubShapeID2,
+            manifold.WorldSpaceNormal, ref settings);
         var contact = CreateEvent(a, b, manifold, false);
         if (ShouldDispatchGlobalTouch(a.ID, b.ID)) added.Enqueue(contact);
         if (ShouldDispatchGlobalCollision(a.ID, b.ID))
@@ -77,7 +78,8 @@ public sealed class SourceContactRouter
 
     internal void OnPersisted(PhysicsSystem system, in Body a, in Body b, in ContactManifold manifold, ref ContactSettings settings)
     {
-        ApplySourceCombine(a, b, manifold.SubShapeID1, manifold.SubShapeID2, ref settings);
+        ApplySourceCombine(a, b, manifold.SubShapeID1, manifold.SubShapeID2,
+            manifold.WorldSpaceNormal, ref settings);
         var contact = CreateEvent(a, b, manifold, true);
         if (ShouldDispatchGlobalTouch(a.ID, b.ID)) persisted.Enqueue(contact);
         QueueTrigger(contact);
@@ -90,11 +92,26 @@ public sealed class SourceContactRouter
     }
 
     private void ApplySourceCombine(in Body a, in Body b, SubShapeID subShapeA, SubShapeID subShapeB,
-        ref ContactSettings settings)
+        Vector3 worldNormal, ref ContactSettings settings)
     {
         var first = surfaceResolver(in a, subShapeA);
         var second = surfaceResolver(in b, subShapeB);
-        settings.CombinedFriction = materialPolicy.GetFriction(first, second);
+        var firstIsVehicleWheel = (callbackFlagsResolver(a.ID) & SourceCallbackFlags.IsVehicleWheel) != 0;
+        var secondIsVehicleWheel = (callbackFlagsResolver(b.ID) & SourceCallbackFlags.IsVehicleWheel) != 0;
+        if (firstIsVehicleWheel || secondIsVehicleWheel)
+        {
+            // physics_material.cpp routes vehicle-wheel contacts through
+            // ShouldOverrideWheelContactFriction before the ordinary IVP
+            // material combine. Its 15-degree cone is evaluated in wheel
+            // space and returns exactly 1 or 0 for the wheel contact.
+            var wheel = firstIsVehicleWheel ? a : b;
+            var wheelNormal = Vector3.Transform(worldNormal, Quaternion.Inverse(wheel.Rotation));
+            settings.CombinedFriction = SourceVehicleDynamics.OverrideWheelContactFriction(1f, wheelNormal);
+        }
+        else
+        {
+            settings.CombinedFriction = materialPolicy.GetFriction(first, second);
+        }
         settings.CombinedRestitution = materialPolicy.GetRestitution(first, second);
     }
     internal void OnRemoved(PhysicsSystem _, ref SubShapeIDPair pair)
