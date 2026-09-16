@@ -825,6 +825,25 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void ProjectileQueryHonorsSourceProjectileCollisionGroup()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(1024, 0, 1024, 256);
+        var weapon = host.CreateBoxBody(new(0.5f), new(0f, 0f, 2f), JoltPhysicsSharp.MotionType.Static,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                CollisionGroup = SourceCollisionGroup.Weapon,
+                ContentsMask = SourceContents.Solid
+            });
+        using var projectile = new JoltProjectileQueries(host, radiusSourceUnits: 1f);
+        using var hitscan = new JoltHitscanQueries(host);
+
+        Assert.False(projectile.Sweep(Vector3.Zero, new(0f, 0f, 4f), out _));
+        Assert.True(hitscan.Cast(Vector3.Zero, Vector3.UnitZ, 4f, out var hit));
+        Assert.Equal(unchecked((int)weapon.ID), hit.BodyId);
+    }
+
+    [Fact]
     public void JoltStaticMeshBodyProvidesTriangleCollisionForPlayerSweep()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
