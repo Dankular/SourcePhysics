@@ -69,7 +69,7 @@ public sealed class SourceMultiDamageAccumulator
         accumulated = accumulated with
         {
             Damage = accumulated.Damage + info.Damage,
-            MaxDamage = MathF.Max(accumulated.MaxDamage, info.Damage),
+            MaxDamage = MathF.Max(accumulated.MaxDamage, info.MaxDamage),
             DamageForce = accumulated.DamageForce + info.DamageForce,
             DamagePosition = info.DamagePosition,
             ReportedPosition = info.ReportedPosition,

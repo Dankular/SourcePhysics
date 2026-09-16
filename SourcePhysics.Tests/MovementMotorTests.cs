@@ -2261,7 +2261,7 @@ public sealed class MovementMotorTests
         var target = new DamageTargetProbe();
         var accumulator = new SourceMultiDamageAccumulator();
         var first = new SourceDamageInfo(10f, 10f, Vector3.UnitX, Vector3.Zero, Vector3.One, 0x2, 3);
-        var second = new SourceDamageInfo(7f, 7f, Vector3.UnitY, Vector3.One, Vector3.UnitZ, 0x8, 4);
+        var second = new SourceDamageInfo(7f, 20f, Vector3.UnitY, Vector3.One, Vector3.UnitZ, 0x8, 4);
 
         accumulator.DispatchTraceAttack(12, target, first, Vector3.UnitZ, default);
         accumulator.DispatchTraceAttack(12, target, second, Vector3.UnitZ, default);
@@ -2271,7 +2271,7 @@ public sealed class MovementMotorTests
         accumulator.ApplyMultiDamage();
         Assert.Equal(1, target.TakeDamageCount);
         Assert.Equal(17f, target.LastDamage.Damage);
-        Assert.Equal(10f, target.LastDamage.MaxDamage);
+        Assert.Equal(20f, target.LastDamage.MaxDamage);
         Assert.Equal(Vector3.UnitX + Vector3.UnitY, target.LastDamage.DamageForce);
         Assert.Equal(0xA, target.LastDamage.DamageType);
         Assert.Equal(4, target.LastDamage.AmmoType);
