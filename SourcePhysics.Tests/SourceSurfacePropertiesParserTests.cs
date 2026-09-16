@@ -43,4 +43,13 @@ public sealed class SourceSurfacePropertiesParserTests
         Assert.Throws<InvalidDataException>(() => SourceSurfaceRegistry.FromSurfaceProperties(
             "surfaceproperties { \"metal\" { \"friction\" \"0.5\" \"unhandled\" { \"value\" \"1\" } } }"));
     }
+
+    [Fact]
+    public void ParserRejectsDuplicateSurfaceKeysAndNames()
+    {
+        Assert.Throws<InvalidDataException>(() => SourceSurfaceRegistry.FromSurfaceProperties(
+            "surfaceproperties { \"metal\" { \"friction\" \"0.5\" \"friction\" \"0.8\" } }"));
+        Assert.Throws<InvalidDataException>(() => SourceSurfaceRegistry.FromSurfaceProperties(
+            "surfaceproperties { \"metal\" { \"friction\" \"0.5\" } \"metal\" { \"friction\" \"0.8\" } }"));
+    }
 }

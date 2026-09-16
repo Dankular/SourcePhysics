@@ -32,6 +32,11 @@ internal static class SourceSurfacePropertiesParser
             ? root.Children : (IEnumerable<Block>)new[] { root }).ToArray();
         if (surfaceBlocks.Any(block => block.Children.Count != 0))
             throw new InvalidDataException("Nested blocks inside a Source surface are unsupported and would discard authored data.");
+        var duplicateName = surfaceBlocks
+            .GroupBy(block => block.Name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicateName is not null)
+            throw new InvalidDataException($"Duplicate Source surface '{duplicateName.Key}'.");
         var byName = surfaceBlocks.ToDictionary(block => block.Name, StringComparer.OrdinalIgnoreCase);
         var resolved = new Dictionary<string, SourceSurface>(StringComparer.OrdinalIgnoreCase);
         var resolving = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -86,6 +91,8 @@ internal static class SourceSurfacePropertiesParser
             {
                 var value = tokens[index++];
                 if (value is "{" or "}") throw new InvalidDataException($"Invalid value for surface key '{key}'.");
+                if (block.Values.ContainsKey(key))
+                    throw new InvalidDataException($"Duplicate Source surface key '{key}' in '{name}'.");
                 block.Values[key] = value;
             }
         }
