@@ -23,6 +23,28 @@ public sealed class StaticMeshCookerTests
     }
 
     [Fact]
+    public void CookingPreservesAuthoredTriggerContentsAndCollisionState()
+    {
+        var vertices = new[] { new Vector3(0, 0, 0), new Vector3(1, 0, 0), new Vector3(0, 1, 0) };
+        var profile = new SourceStaticMeshProfile
+        {
+            ContentsMask = SourceContents.Water,
+            SolidFlags = SourceSolidFlags.NotSolid | SourceSolidFlags.Trigger,
+            CollisionGroup = SourceCollisionGroup.DebrisTrigger,
+            TriggerTouchesDebris = true,
+            UserData = 91
+        };
+
+        var cooked = SourceStaticMeshCooker.Cook(vertices, new[] { Triangle(0, 1, 2) }, profile);
+
+        Assert.Equal(profile.ContentsMask, cooked.Profile.ContentsMask);
+        Assert.Equal(profile.SolidFlags, cooked.Profile.SolidFlags);
+        Assert.Equal(profile.CollisionGroup, cooked.Profile.CollisionGroup);
+        Assert.Equal(profile.TriggerTouchesDebris, cooked.Profile.TriggerTouchesDebris);
+        Assert.Equal(profile.UserData, cooked.Profile.UserData);
+    }
+
+    [Fact]
     public void WeldingIsDeterministicAndRemapsSurfaceIds()
     {
         var vertices = new[]
