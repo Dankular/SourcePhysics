@@ -2227,6 +2227,26 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void CounterStrikeGrenadeUsesSourceBaseVelocityForFloorResidualMotion()
+    {
+        var projectile = new SourceProjectileMotor(new SourceProjectileProfile
+        {
+            GravityScale = 0f,
+            Restitution = 1f,
+            MaximumBounces = 2,
+            CollisionMode = SourceProjectileCollisionMode.CounterStrikeGrenade
+        }, new HalfFractionFloorProjectileQueries(), new(0, 1, 0), new(0, -10, 0));
+        projectile.BaseVelocityResolver = _ => new(2f, 0f, 0f);
+
+        projectile.Tick(0.1f);
+
+        Assert.Equal(new Vector3(0f, 9f, 0f), projectile.State.Velocity);
+        Assert.Equal(1, projectile.State.Bounces);
+        Assert.Equal(0.2f, projectile.State.Position.X, 4);
+        Assert.Equal(0.45f, projectile.State.Position.Y, 4);
+    }
+
+    [Fact]
     public void ProjectileUsesConfiguredGravityRatherThanHiddenConstant()
     {
         var queries = new NoHitProjectileQueries();
@@ -3310,6 +3330,19 @@ public sealed class MovementMotorTests
             {
                 var fraction = start.Y / (start.Y - end.Y);
                 hit = new(Vector3.Lerp(start, end, fraction), Vector3.UnitY, 1, 0f);
+                return true;
+            }
+            hit = default; return false;
+        }
+    }
+
+    private sealed class HalfFractionFloorProjectileQueries : IProjectileQueries
+    {
+        public bool Sweep(Vector3 start, Vector3 end, out ProjectileHit hit)
+        {
+            if (start.Y >= 0 && end.Y <= 0)
+            {
+                hit = new(Vector3.Zero, Vector3.UnitY, 1, 0f, Fraction: 0.5f);
                 return true;
             }
             hit = default; return false;

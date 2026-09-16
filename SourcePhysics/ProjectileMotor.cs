@@ -66,6 +66,10 @@ public sealed class SourceProjectileMotor
     /// contacted breakable. A destroyed breakable uses Source's 0.4 velocity
     /// continuation instead of grenade bounce resolution.
     public Func<ProjectileHit, bool>? BreakableImpactDestroyed { get; set; }
+    /// Resolves Source GetBaseVelocity for the contacted ground/conveyor.
+    /// The resolver is title-owned because Source derives it from entity state,
+    /// not from the projectile's collision material.
+    public Func<ProjectileHit, Vector3>? BaseVelocityResolver { get; set; }
 
     public SourceProjectileMotor(SourceProjectileProfile profile, IProjectileQueries queries, Vector3 position, Vector3 velocity)
     {
@@ -131,22 +135,44 @@ public sealed class SourceProjectileMotor
         var totalElasticity = Math.Clamp(profile.Restitution * surfaceElasticity, 0f, 0.9f);
         var clipped = velocity - hit.Normal * Vector3.Dot(velocity, hit.Normal) * 2f;
         var reflected = clipped * totalElasticity;
+        var baseVelocity = BaseVelocityResolver?.Invoke(hit) ?? Vector3.Zero;
+        if (!IsFinite(baseVelocity)) throw new InvalidDataException("Projectile base velocity is not finite.");
+        var totalVelocity = reflected + baseVelocity;
         var stopSpeed = SourceUnits.ToMeters(30f);
-        var speedSquared = reflected.LengthSquared();
+        var speedSquared = totalVelocity.LengthSquared();
+        if (hit.Normal.Y > 0.7f)
+        {
+            // Source stores the projectile velocity without the base velocity,
+            // but evaluates rest against the total velocity. A slow floor hit
+            // becomes grounded/stationary.
+            if (speedSquared < stopSpeed * stopSpeed || State.Bounces >= profile.MaximumBounces)
+            {
+                State = State with { Position = hit.Position, Velocity = Vector3.Zero, Active = false };
+                return;
+            }
+
+            var remainingFraction = (1f - Math.Clamp(hit.Fraction, 0f, 1f)) * dt;
+            var baseDirection = baseVelocity.LengthSquared() > 1e-12f
+                ? Vector3.Normalize(baseVelocity) : Vector3.Zero;
+            var baseScale = Vector3.Dot(baseVelocity - reflected, baseDirection);
+            var residualMotion = reflected * remainingFraction + baseVelocity * (remainingFraction * baseScale);
+            State = State with
+            {
+                Position = hit.Position + residualMotion,
+                Velocity = reflected,
+                Bounces = State.Bounces + 1
+            };
+            return;
+        }
+
+        // Source also stops against non-floor surfaces if the total velocity
+        // falls below the resting threshold.
         if (speedSquared < stopSpeed * stopSpeed || State.Bounces >= profile.MaximumBounces)
         {
             State = State with { Position = hit.Position, Velocity = Vector3.Zero, Active = false };
             return;
         }
-
-        var position = hit.Position;
-        if (hit.Normal.Y > 0.7f)
-        {
-            // The Source custom floor path pushes the remaining fraction of
-            // the frame after a high-speed bounce.
-            position += reflected * ((1f - Math.Clamp(hit.Fraction, 0f, 1f)) * dt * 0.9f);
-        }
-        State = State with { Position = position, Velocity = reflected, Bounces = State.Bounces + 1 };
+        State = State with { Position = hit.Position, Velocity = reflected, Bounces = State.Bounces + 1 };
     }
 
     private static bool IsFinite(Vector3 value) =>
