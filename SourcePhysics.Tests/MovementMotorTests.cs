@@ -1526,6 +1526,7 @@ public sealed class MovementMotorTests
             JoltPhysicsSharp.MotionType.Static, SourceObjectLayer.World);
         var weapon = new JoltHitscanWeapon { CanPenetrateGlass = hit =>
             (hit.Contents & SourceContents.Window) != 0 };
+        weapon.Recording = new WeaponRecording();
         var hits = new List<HitscanHit>();
         weapon.Hit += hits.Add;
         weapon.Initialize(host);
@@ -1535,6 +1536,10 @@ public sealed class MovementMotorTests
 
         Assert.Equal(2, hits.Count);
         Assert.Equal(behind.ID, unchecked((uint)hits[1].BodyId));
+        Assert.Equal(2, weapon.Recording.Frames.Count);
+        Assert.Equal(0, weapon.Recording.Frames[0].RefireDepth);
+        Assert.Equal(1, weapon.Recording.Frames[1].RefireDepth);
+        Assert.Equal(0, weapon.Recording.Frames[1].ParentShotIndex);
         weapon.Cancel();
     }
 

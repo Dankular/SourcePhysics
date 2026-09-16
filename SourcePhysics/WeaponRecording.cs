@@ -29,7 +29,9 @@ public readonly record struct WeaponShotFrame(
     int InflictorBodyId = -1,
     int AttackerBodyId = -1,
     int WeaponBodyId = -1,
-    float PhysicsPushScale = 1f);
+    float PhysicsPushScale = 1f,
+    int RefireDepth = 0,
+    int ParentShotIndex = -1);
 
 public sealed class WeaponRecording
 {
@@ -42,7 +44,8 @@ public sealed class WeaponRecording
 
     public void Capture(int tick, int shotIndex, int randomSeed, Vector3 origin, Vector3 direction,
         bool hit, HitscanHit hitData, in SourceFireBulletsInfo info, SourceFireBulletsImpact? impact,
-        SourceShotTraceShape traceShape = SourceShotTraceShape.Ray, float physicsPushScale = 1f)
+        SourceShotTraceShape traceShape = SourceShotTraceShape.Ray, float physicsPushScale = 1f,
+        int refireDepth = 0, int parentShotIndex = -1)
     {
         Frames.Add(new(tick, shotIndex, randomSeed, origin, direction, hit, hitData,
             info.AmmoType, info.PlayerDamage, impact?.Damage ?? 0f,
@@ -52,7 +55,7 @@ public sealed class WeaponRecording
             impact?.DamageSuppressed ?? false, impact?.DamageForce ?? default,
             impact?.TracerDestination ?? (hit ? hitData.Position : origin + direction * info.DistanceMeters),
             traceShape, info.AdditionalIgnoreBodyId, info.InflictorBodyId,
-            info.AttackerBodyId, info.WeaponBodyId, physicsPushScale));
+            info.AttackerBodyId, info.WeaponBodyId, physicsPushScale, refireDepth, parentShotIndex));
     }
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
@@ -124,6 +127,10 @@ public static class WeaponParityComparator
                 errors.Add(new(left.Tick, left.ShotIndex, "weapon-body"));
             if (left.PhysicsPushScale != right.PhysicsPushScale)
                 errors.Add(new(left.Tick, left.ShotIndex, "physics-push-scale"));
+            if (left.RefireDepth != right.RefireDepth)
+                errors.Add(new(left.Tick, left.ShotIndex, "refire-depth"));
+            if (left.ParentShotIndex != right.ParentShotIndex)
+                errors.Add(new(left.Tick, left.ShotIndex, "parent-shot-index"));
 
             var directionError = Vector3.Distance(left.Direction, right.Direction);
             directionSum += directionError * directionError;

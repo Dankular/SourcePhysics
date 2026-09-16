@@ -132,10 +132,11 @@ public sealed class JoltHitscanWeapon : SyncScript
     /// Executes the Source FireBullets field selection and shot/impact ordering. Target damage dispatch
     /// remains an event so the game's entity system can perform TraceAttack/ApplyMultiDamage semantics.
     public IReadOnlyList<ShotResult> FireBullets(in SourceFireBulletsInfo info, int sourceRandomSeed) =>
-        FireBulletsInternal(in info, sourceRandomSeed, advanceRecordingTick: true);
+        FireBulletsInternal(in info, sourceRandomSeed, advanceRecordingTick: true,
+            refireDepth: 0, parentShotIndex: -1);
 
     private IReadOnlyList<ShotResult> FireBulletsInternal(in SourceFireBulletsInfo info, int sourceRandomSeed,
-        bool advanceRecordingTick)
+        bool advanceRecordingTick, int refireDepth, int parentShotIndex)
     {
         if (info.Shots < 1) throw new ArgumentOutOfRangeException(nameof(info), "Shots must be positive.");
         if (!IsFinite(info.OriginMeters) || !IsFinite(info.Direction) || !IsFinite(info.Spread))
@@ -200,7 +201,8 @@ public sealed class JoltHitscanWeapon : SyncScript
             if (!result.Hit)
             {
                 Recording?.Capture(RecordingTick, shot, shotSeed, info.OriginMeters, result.Direction,
-                    false, result.HitData, in resolvedInfo, null, traceShape, PhysicsPushScale);
+                    false, result.HitData, in resolvedInfo, null, traceShape, PhysicsPushScale,
+                    refireDepth, parentShotIndex);
                 continue;
             }
             var startedInWater = IsWaterPoint?.Invoke(info.OriginMeters) ?? false;
@@ -259,7 +261,8 @@ public sealed class JoltHitscanWeapon : SyncScript
                 ForceDropIfCarried?.Invoke(result.HitData);
             Impact?.Invoke(impact);
             Recording?.Capture(RecordingTick, shot, shotSeed, info.OriginMeters, result.Direction,
-                true, result.HitData, in resolvedInfo, impact, traceShape, PhysicsPushScale);
+                true, result.HitData, in resolvedInfo, impact, traceShape, PhysicsPushScale,
+                refireDepth, parentShotIndex);
 
             // CBaseEntity::FireBullets calls HandleShotImpactingGlass after the
             // first impact. That routine constructs a fresh one-shot
@@ -289,7 +292,8 @@ public sealed class JoltHitscanWeapon : SyncScript
                             Flags: info.Flags, PrimaryAttack: info.PrimaryAttack,
                             AttackerBodyId: info.AttackerBodyId);
                         FireBulletsInternal(in behindGlassInfo, sourceRandomSeed,
-                            advanceRecordingTick: false);
+                            advanceRecordingTick: false, refireDepth: refireDepth + 1,
+                            parentShotIndex: shot);
                     }
                 }
             }
