@@ -222,10 +222,12 @@ public sealed class JoltHitscanQueries : IDisposable
         {
             if (!Cast(currentStart, direction, traceDistance, out var entry)) break;
             var entryDistanceInches = SourceUnits.ToSource(entry.Fraction * traceDistance);
+            state = state with { CurrentDistance = state.CurrentDistance + entryDistanceInches };
+            // Source multiplies by pow(rangeModifier, flCurrentDistance / 500)
+            // after updating the cumulative distance on every entry trace.
             state = state with
             {
-                Damage = state.Damage * MathF.Pow(rangeModifier, entryDistanceInches / 500f),
-                CurrentDistance = state.CurrentDistance + entryDistanceInches
+                Damage = state.Damage * MathF.Pow(rangeModifier, state.CurrentDistance / 500f)
             };
             impacts.Add(new(entry, false, state.Damage));
             var entryIsGrate = (entry.Contents & SourceContents.Grate) != 0;

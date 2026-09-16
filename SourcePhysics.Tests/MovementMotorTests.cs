@@ -1949,6 +1949,13 @@ public sealed class MovementMotorTests
             SourceBulletMaterial.Concrete, SourceBulletMaterial.Concrete, 1f, true, 1f);
         Assert.True(grate.Success);
         Assert.Equal(-1, grate.State.PenetrationsRemaining);
+
+        var falloff = SourceCounterStrikePenetration.TryPenetrate(
+            new SourcePenetrationState(100f, 30f, 100f, 1),
+            SourceBulletMaterial.Wood, SourceBulletMaterial.Wood, 10f, false, 0.5f);
+        Assert.True(falloff.Success);
+        Assert.Equal(100f * MathF.Pow(0.5f, 110f / 500f) * 0.6f,
+            falloff.State.Damage, 4);
     }
 
     [Fact]
