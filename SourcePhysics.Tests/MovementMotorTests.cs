@@ -2867,7 +2867,7 @@ public sealed class MovementMotorTests
     public void SourceVehicleWheelContactFrictionUsesReferenceFifteenDegreeCone()
     {
         Assert.Equal(0f, SourceVehicleDynamics.OverrideWheelContactFriction(1f, new(0.3f, 0f, 0.9539392f)));
-        Assert.Equal(1f, SourceVehicleDynamics.OverrideWheelContactFriction(1f, new(0.2f, 0f, 0.9797959f)));
+        Assert.Equal(0.7f, SourceVehicleDynamics.OverrideWheelContactFriction(0.7f, new(0.2f, 0f, 0.9797959f)));
     }
 
     [Fact]

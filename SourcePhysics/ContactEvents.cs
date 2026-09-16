@@ -96,6 +96,7 @@ public sealed class SourceContactRouter
     {
         var first = surfaceResolver(in a, subShapeA);
         var second = surfaceResolver(in b, subShapeB);
+        var combinedFriction = materialPolicy.GetFriction(first, second);
         var firstIsVehicleWheel = (callbackFlagsResolver(a.ID) & SourceCallbackFlags.IsVehicleWheel) != 0;
         var secondIsVehicleWheel = (callbackFlagsResolver(b.ID) & SourceCallbackFlags.IsVehicleWheel) != 0;
         if (firstIsVehicleWheel || secondIsVehicleWheel)
@@ -103,15 +104,14 @@ public sealed class SourceContactRouter
             // physics_material.cpp routes vehicle-wheel contacts through
             // ShouldOverrideWheelContactFriction before the ordinary IVP
             // material combine. Its 15-degree cone is evaluated in wheel
-            // space and returns exactly 1 or 0 for the wheel contact.
+            // space and returns zero only for an invalid wheel contact;
+            // otherwise Source falls through to the ordinary material
+            // result.
             var wheel = firstIsVehicleWheel ? a : b;
             var wheelNormal = Vector3.Transform(worldNormal, Quaternion.Inverse(wheel.Rotation));
-            settings.CombinedFriction = SourceVehicleDynamics.OverrideWheelContactFriction(1f, wheelNormal);
+            combinedFriction = SourceVehicleDynamics.OverrideWheelContactFriction(combinedFriction, wheelNormal);
         }
-        else
-        {
-            settings.CombinedFriction = materialPolicy.GetFriction(first, second);
-        }
+        settings.CombinedFriction = combinedFriction;
         settings.CombinedRestitution = materialPolicy.GetRestitution(first, second);
     }
     internal void OnRemoved(PhysicsSystem _, ref SubShapeIDPair pair)
