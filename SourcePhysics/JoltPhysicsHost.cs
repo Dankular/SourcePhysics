@@ -598,6 +598,41 @@ public sealed partial class JoltPhysicsHost : IDisposable
         }
     }
 
+    /// <summary>Applies Source CPhysicsObject::SetDamping semantics.</summary>
+    public void SetBodyDamping(BodyID bodyId, float? linearDamping, float? angularDamping)
+    {
+        EnsureDynamicBody(bodyId);
+        if (linearDamping is { } linear && (!float.IsFinite(linear) || linear < 0f))
+            throw new ArgumentOutOfRangeException(nameof(linearDamping));
+        if (angularDamping is { } angular && (!float.IsFinite(angular) || angular < 0f))
+            throw new ArgumentOutOfRangeException(nameof(angularDamping));
+        if (!bodyProfiles.TryGetValue(bodyId.ID, out var profile))
+            throw new InvalidOperationException("Body has no Source rigid-body profile.");
+
+        var lockInterface = System.BodyLockInterfaceNoLock;
+        lockInterface.LockWrite(in bodyId, out var lockWrite);
+        if (!lockWrite.Succeeded || lockWrite.Body is null)
+            throw new InvalidOperationException("Jolt could not lock the body for damping mutation.");
+        try
+        {
+            var motionProperties = lockWrite.Body.MotionProperties;
+            if (linearDamping is { } linearValue)
+                motionProperties.LinearDamping = linearValue;
+            if (angularDamping is { } angularValue)
+                motionProperties.AngularDamping = angularValue;
+        }
+        finally
+        {
+            lockInterface.UnlockWrite(in lockWrite);
+        }
+
+        bodyProfiles[bodyId.ID] = profile with
+        {
+            LinearDampingPerSecond = linearDamping ?? profile.LinearDampingPerSecond,
+            AngularDampingPerSecond = angularDamping ?? profile.AngularDampingPerSecond
+        };
+    }
+
     public void MoveKinematic(BodyID bodyId, Vector3 targetPosition, Quaternion targetRotation, float deltaSeconds)
     {
         if (!initialized || !bodyId.IsValid || !Bodies.IsAdded(bodyId))

@@ -2987,6 +2987,27 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceSetDampingUpdatesIndependentChannels()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize();
+        var body = host.CreateBoxBody(new(0.5f), Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                GravityFactor = 0f, LinearDampingPerSecond = 0.5f, AngularDampingPerSecond = 0.75f
+            });
+
+        host.SetBodyDamping(body, 0f, null);
+        host.SetBodyDamping(body, null, 0f);
+        host.Bodies.SetLinearVelocity(body, Vector3.UnitX);
+        host.Bodies.SetAngularVelocity(body, Vector3.UnitY);
+        host.Step();
+
+        Assert.Equal(1f, host.Bodies.GetLinearVelocity(body).X, 5);
+        Assert.Equal(1f, host.Bodies.GetAngularVelocity(body).Y, 5);
+    }
+
+    [Fact]
     public void SourceFluidProfileUsesReferencedDefaultTorqueFactor()
     {
         var profile = new SourceFluidProfile();
