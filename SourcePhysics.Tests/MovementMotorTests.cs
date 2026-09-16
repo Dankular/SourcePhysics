@@ -2692,6 +2692,23 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void RigidBodyFluidCallbackContractPreservesSourceBuoyancyRatioAndDisableFlag()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize();
+        var scaled = host.CreateBoxBody(new(0.25f), Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { BuoyancyRatio = 0.35f });
+        var disabled = host.CreateBoxBody(new(0.25f), Vector3.UnitX, JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { FluidSimulationEnabled = false });
+
+        Assert.Equal(0.35f, host.GetBodyBuoyancyRatio(scaled));
+        Assert.True(host.IsFluidSimulationEnabled(scaled));
+        Assert.Equal(1f, host.GetBodyBuoyancyRatio(disabled));
+        Assert.False(host.IsFluidSimulationEnabled(disabled));
+        Assert.Throws<InvalidDataException>(() => new SourceRigidBodyProfile { BuoyancyRatio = -1f }.Validate());
+    }
+
+    [Fact]
     public void SourceFluidSurfacePlaneFollowsFluidObjectTransform()
     {
         var rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI * 0.5f);

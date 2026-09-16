@@ -157,9 +157,10 @@ public sealed class JoltFluidController : IDisposable
                 (surface.Distance - Vector3.Dot(surface.Normal, pair.Value.Point));
             host.ApplySourceFluidTouchDamping(bodyId, surface.Normal, profile.DensityKgPerM3,
                 profile.Damping, profile.TorqueFactor, deltaSeconds);
-            if (profile.BuoyancyForceNewtons is { } buoyancy)
+            if (profile.BuoyancyForceNewtons is { } buoyancy && host.IsFluidSimulationEnabled(bodyId))
                 host.ApplyBuoyancyImpulse(bodyId, surfacePoint, surface.Normal, buoyancy,
-                    profile.ViscosityFactor, profile.TorqueFactor, surface.CurrentVelocity, deltaSeconds);
+                    profile.ViscosityFactor, profile.TorqueFactor, surface.CurrentVelocity, deltaSeconds,
+                    host.GetBodyBuoyancyRatio(bodyId));
         }
     }
 

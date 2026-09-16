@@ -365,6 +365,10 @@ public sealed partial class JoltPhysicsHost : IDisposable
     }
 
     public SourceContents GetBodyContents(BodyID id) => bodyContents.TryGetValue(id.ID, out var contents) ? contents : SourceContents.Solid;
+    public float GetBodyBuoyancyRatio(BodyID id) =>
+        bodyProfiles.TryGetValue(id.ID, out var profile) ? profile.BuoyancyRatio : 1f;
+    public bool IsFluidSimulationEnabled(BodyID id) =>
+        !bodyProfiles.TryGetValue(id.ID, out var profile) || profile.FluidSimulationEnabled;
     public SourceCollisionGroup GetBodyCollisionGroup(BodyID id) =>
         bodyCollisionGroups.TryGetValue(id.ID, out var group) ? group : SourceCollisionGroup.None;
     public bool CanQueryCollide(SourceCollisionGroup queryGroup, BodyID bodyId) =>
@@ -521,7 +525,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
     /// controller parameters remain caller-owned, matching VPhysics' separate fluid controller.
     /// </summary>
     public bool ApplyBuoyancyImpulse(BodyID bodyId, Vector3 surfacePosition, Vector3 surfaceNormal,
-        float buoyancy, float linearDrag, float angularDrag, Vector3 fluidVelocity, float deltaSeconds)
+        float buoyancy, float linearDrag, float angularDrag, Vector3 fluidVelocity, float deltaSeconds,
+        float buoyancyRatio = 1f)
     {
         EnsureDynamicBody(bodyId);
         if (!IsFinite(surfaceNormal) || surfaceNormal.LengthSquared() < 1e-12f)
@@ -531,10 +536,11 @@ public sealed partial class JoltPhysicsHost : IDisposable
         if (!float.IsFinite(angularDrag) || angularDrag < 0f) throw new ArgumentOutOfRangeException(nameof(angularDrag));
         if (!IsFinite(fluidVelocity)) throw new ArgumentOutOfRangeException(nameof(fluidVelocity));
         if (!float.IsFinite(deltaSeconds) || deltaSeconds <= 0f) throw new ArgumentOutOfRangeException(nameof(deltaSeconds));
+        if (!float.IsFinite(buoyancyRatio) || buoyancyRatio < 0f) throw new ArgumentOutOfRangeException(nameof(buoyancyRatio));
         var gravity = System.Gravity;
         RVector3 preciseSurfacePosition = surfacePosition;
         return Bodies.ApplyBuoyancyImpulse(in bodyId, in preciseSurfacePosition, in surfaceNormal,
-            buoyancy, linearDrag, angularDrag, in fluidVelocity, in gravity, deltaSeconds);
+            buoyancy * buoyancyRatio, linearDrag, angularDrag, in fluidVelocity, in gravity, deltaSeconds);
     }
 
     /// Mirrors the referenced VPhysics FluidStartTouch velocity damping. The

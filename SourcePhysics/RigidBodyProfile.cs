@@ -17,6 +17,13 @@ public sealed record SourceRigidBodyProfile
     public bool AllowSleep { get; init; } = true;
     public float Friction { get; init; } = 0.8f;
     public float Restitution { get; init; } = 0.001f;
+    /// Source CPhysicsObject::GetBuoyancyRatio.  This scales the liquid
+    /// medium density for this object's buoyancy solve; it does not alter
+    /// fluid-touch damping.
+    public float BuoyancyRatio { get; init; } = 1f;
+    /// Source CALLBACK_DO_FLUID_SIMULATION.  When disabled, the object is
+    /// still eligible for touch bookkeeping, but receives no buoyant force.
+    public bool FluidSimulationEnabled { get; init; } = true;
     public SourceContents ContentsMask { get; init; } = SourceContents.Solid;
     /// Source collision-property solid flags. TriggerTouchDebris is retained below as a
     /// convenient compatibility alias for authored trigger profiles.
@@ -40,7 +47,7 @@ public sealed record SourceRigidBodyProfile
             MassKg, InertiaScale, LinearDampingPerSecond, AngularDampingPerSecond,
             DragCoefficientPerSecond, RollingDragCoefficientPerSecond, GravityFactor,
             MaxLinearVelocityMetersPerSecond, MaxAngularVelocityRadiansPerSecond,
-            Friction, Restitution
+            Friction, Restitution, BuoyancyRatio
         };
         if (scalars.Any(value => !float.IsFinite(value)))
             throw new InvalidDataException("Rigid-body profile contains a non-finite value.");
@@ -50,6 +57,8 @@ public sealed record SourceRigidBodyProfile
             MaxLinearVelocityMetersPerSecond <= 0f || MaxAngularVelocityRadiansPerSecond <= 0f ||
             Friction < 0f || Restitution < 0f)
             throw new InvalidDataException("Rigid-body profile contains an invalid negative or zero-required value.");
+        if (BuoyancyRatio < 0f)
+            throw new InvalidDataException("Rigid-body buoyancy ratio cannot be negative.");
         if (!float.IsFinite(CenterOfMassOffsetMeters.X) || !float.IsFinite(CenterOfMassOffsetMeters.Y) || !float.IsFinite(CenterOfMassOffsetMeters.Z))
             throw new InvalidDataException("Rigid-body center-of-mass offset must be finite.");
     }
