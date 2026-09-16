@@ -2008,6 +2008,23 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void ProjectileProfileRejectsInvalidAuthoredValues()
+    {
+        Assert.Throws<InvalidDataException>(() => new SourceProjectileProfile
+        {
+            GravityScale = -1f
+        }.Validate());
+        Assert.Throws<InvalidDataException>(() => new SourceProjectileProfile
+        {
+            MaximumVelocitySourceUnitsPerSecond = 0f
+        }.Validate());
+        Assert.Throws<InvalidDataException>(() => new SourceProjectileProfile
+        {
+            MaximumBounces = -1
+        }.Validate());
+    }
+
+    [Fact]
     public void ProjectilePenetrationUsesExplicitQueryAndTracksBudget()
     {
         var queries = new PenetratingProjectileQueries();

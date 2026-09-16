@@ -35,6 +35,23 @@ public sealed record SourceProjectileProfile
     public float MaximumVelocitySourceUnitsPerSecond { get; init; } = 3500f;
     public bool ContinuousCollision { get; init; } = true;
     public SourceProjectileCollisionMode CollisionMode { get; init; } = SourceProjectileCollisionMode.Generic;
+
+    public void Validate()
+    {
+        var scalars = new[]
+        {
+            GravitySourceUnitsPerSecondSquared, GravityScale, Restitution,
+            PenetrationPower, MaximumVelocitySourceUnitsPerSecond
+        };
+        if (scalars.Any(value => !float.IsFinite(value) || value < 0f))
+            throw new InvalidDataException("Projectile profile contains an invalid scalar.");
+        if (MaximumVelocitySourceUnitsPerSecond <= 0f)
+            throw new InvalidDataException("Projectile maximum velocity must be positive.");
+        if (MaximumBounces < 0 || MaximumPenetrations < 0)
+            throw new InvalidDataException("Projectile bounce and penetration counts cannot be negative.");
+        if (!Enum.IsDefined(CollisionMode))
+            throw new InvalidDataException("Projectile collision mode is not defined.");
+    }
 }
 
 public sealed class SourceProjectileMotor
@@ -52,6 +69,9 @@ public sealed class SourceProjectileMotor
 
     public SourceProjectileMotor(SourceProjectileProfile profile, IProjectileQueries queries, Vector3 position, Vector3 velocity)
     {
+        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(queries);
+        profile.Validate();
         this.profile = profile; this.queries = queries;
         State = new(position, velocity, true, 0);
     }
