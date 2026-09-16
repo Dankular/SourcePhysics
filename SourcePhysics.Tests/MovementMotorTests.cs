@@ -2763,6 +2763,8 @@ public sealed class MovementMotorTests
             Damping = 1f,
             TorqueFactor = 0.01f,
             ViscosityFactor = 0.1f,
+            GameData = 42,
+            UseAerodynamics = true,
             BuoyancyForceNewtons = 12f
         };
         profile.Validate();
@@ -2770,6 +2772,8 @@ public sealed class MovementMotorTests
         Assert.Equal(Vector3.UnitY, profile.SurfaceNormal);
         Assert.Equal(1000f, profile.DensityKgPerM3);
         Assert.Equal(12f, profile.BuoyancyForceNewtons);
+        Assert.Equal((ulong)42, profile.GameData);
+        Assert.True(profile.UseAerodynamics);
         Assert.Equal(SourceUnits.ToMeters(new Vector3(4f, 0f, 2f)),
             SourceUnits.ToMeters(profile.CurrentVelocitySourceUnitsPerSecond));
     }
@@ -2842,9 +2846,16 @@ public sealed class MovementMotorTests
             DensityKgPerM3 = 1000f,
             Damping = 1f,
             TorqueFactor = 0.01f,
-            ViscosityFactor = 0.1f
+            ViscosityFactor = 0.1f,
+            GameData = 7
         });
         controller.RegisterFixedStep();
+
+        Assert.Equal(SourceContents.Water, controller.GetContents(fluid));
+        Assert.Equal(1000f, controller.GetDensity(fluid));
+        Assert.Equal((ulong)7, controller.GetGameData(fluid));
+        controller.SetGameData(fluid, 8);
+        Assert.Equal((ulong)8, controller.GetGameData(fluid));
 
         host.Step();
         Assert.True(controller.ActiveContactCount > 0);

@@ -18,6 +18,12 @@ public sealed record SourceFluidProfile
     /// Source initializes viscosity_factor to zero; the separate IVP
     /// viscosity_input_factor is not silently folded into this Jolt parameter.
     public float ViscosityFactor { get; init; }
+    /// Source fluidparams_t::pGameData represented as an authored stable token.
+    public ulong GameData { get; init; }
+    /// Source fluidparams_t::useAerodynamics. The flag is preserved for the
+    /// title adapter; Jolt's available buoyancy primitive does not infer
+    /// surface-pressure aerodynamics from it.
+    public bool UseAerodynamics { get; init; }
     public SourceContents Contents { get; init; } = SourceContents.Water;
     public float? BuoyancyForceNewtons { get; init; }
 
@@ -87,6 +93,17 @@ public sealed class JoltFluidController : IDisposable
     private bool registered;
 
     public int ActiveContactCount => active.Count;
+
+    public SourceContents GetContents(BodyID fluidBody) => GetFluid(fluidBody).Contents;
+    public float GetDensity(BodyID fluidBody) => GetFluid(fluidBody).DensityKgPerM3;
+    public ulong GetGameData(BodyID fluidBody) => GetFluid(fluidBody).GameData;
+
+    public void SetGameData(BodyID fluidBody, ulong gameData)
+    {
+        if (!fluids.TryGetValue(fluidBody.ID, out var profile))
+            throw new ArgumentException("Fluid body is not registered.", nameof(fluidBody));
+        fluids[fluidBody.ID] = profile with { GameData = gameData };
+    }
 
     public JoltFluidController(JoltPhysicsHost host)
     {
@@ -184,6 +201,11 @@ public sealed class JoltFluidController : IDisposable
             transform.M31, transform.M32, transform.M33, 0f,
             0f, 0f, 0f, 1f));
     }
+
+    private SourceFluidProfile GetFluid(BodyID fluidBody) =>
+        fluids.TryGetValue(fluidBody.ID, out var profile)
+            ? profile
+            : throw new ArgumentException("Fluid body is not registered.", nameof(fluidBody));
 
     public void Dispose()
     {
