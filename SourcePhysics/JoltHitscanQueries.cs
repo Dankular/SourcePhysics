@@ -51,6 +51,7 @@ public sealed class JoltHitscanQueries : IDisposable
         SourceContents contentsMask = SourceContents.MaskShot, int ignoredBodyId = -1,
         SourceCollisionGroup queryCollisionGroup = SourceCollisionGroup.None)
     {
+        ArgumentNullException.ThrowIfNull(host);
         this.host = host;
         this.includeSensors = includeSensors;
         this.contentsMask = contentsMask;
@@ -62,6 +63,7 @@ public sealed class JoltHitscanQueries : IDisposable
 
     public bool Cast(Vector3 start, Vector3 direction, float distance, out HitscanHit hit)
     {
+        ValidateRayValues(start, direction, distance);
         if (direction.LengthSquared() < 1e-12f || distance <= 0f)
         {
             hit = default;
@@ -89,6 +91,7 @@ public sealed class JoltHitscanQueries : IDisposable
     /// Source surface/material resolution. This is the ray equivalent of Source's repeated trace loop.
     public IReadOnlyList<HitscanHit> CastAll(Vector3 start, Vector3 direction, float distance)
     {
+        ValidateRayValues(start, direction, distance);
         if (direction.LengthSquared() < 1e-12f || distance <= 0f)
             return Array.Empty<HitscanHit>();
         direction = Vector3.Normalize(direction);
@@ -263,6 +266,15 @@ public sealed class JoltHitscanQueries : IDisposable
         return new(point, normal, unchecked((int)bodyId.ID), surfaceId, result.Fraction,
             Contents: host.GetBodyContents(bodyId));
     }
+
+    private static void ValidateRayValues(Vector3 start, Vector3 direction, float distance)
+    {
+        if (!IsFinite(start) || !IsFinite(direction) || !float.IsFinite(distance))
+            throw new ArgumentOutOfRangeException(nameof(start), "Hitscan ray values must be finite.");
+    }
+
+    private static bool IsFinite(Vector3 value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
 
     public void Dispose() { }
 }

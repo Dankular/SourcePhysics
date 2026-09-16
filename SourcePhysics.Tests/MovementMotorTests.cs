@@ -150,6 +150,19 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void JoltHitscanRejectsNonFiniteRayValues()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        using var queries = new JoltHitscanQueries(host);
+        Assert.Throws<ArgumentOutOfRangeException>(() => queries.Cast(
+            new Vector3(float.NaN, 0f, 0f), Vector3.UnitX, 1f, out _));
+        Assert.Throws<ArgumentOutOfRangeException>(() => queries.Cast(
+            Vector3.Zero, Vector3.UnitX, float.PositiveInfinity, out _));
+        Assert.Throws<ArgumentOutOfRangeException>(() => queries.CastAll(
+            Vector3.Zero, new Vector3(0f, float.NaN, 0f), 1f));
+    }
+
+    [Fact]
     public void SourceFluidTouchDampingMatchesReferencedLinearAndAngularTerms()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
