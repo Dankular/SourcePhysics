@@ -131,7 +131,11 @@ public sealed class JoltHitscanWeapon : SyncScript
 
     /// Executes the Source FireBullets field selection and shot/impact ordering. Target damage dispatch
     /// remains an event so the game's entity system can perform TraceAttack/ApplyMultiDamage semantics.
-    public IReadOnlyList<ShotResult> FireBullets(in SourceFireBulletsInfo info, int sourceRandomSeed)
+    public IReadOnlyList<ShotResult> FireBullets(in SourceFireBulletsInfo info, int sourceRandomSeed) =>
+        FireBulletsInternal(in info, sourceRandomSeed, advanceRecordingTick: true);
+
+    private IReadOnlyList<ShotResult> FireBulletsInternal(in SourceFireBulletsInfo info, int sourceRandomSeed,
+        bool advanceRecordingTick)
     {
         if (info.Shots < 1) throw new ArgumentOutOfRangeException(nameof(info), "Shots must be positive.");
         if (!IsFinite(info.OriginMeters) || !IsFinite(info.Direction) || !IsFinite(info.Spread))
@@ -256,9 +260,42 @@ public sealed class JoltHitscanWeapon : SyncScript
             Impact?.Invoke(impact);
             Recording?.Capture(RecordingTick, shot, shotSeed, info.OriginMeters, result.Direction,
                 true, result.HitData, in resolvedInfo, impact, traceShape, PhysicsPushScale);
+
+            // CBaseEntity::FireBullets calls HandleShotImpactingGlass after the
+            // first impact. That routine constructs a fresh one-shot
+            // FireBulletsInfo_t at the exit point, with zero spread and the
+            // remaining distance measured from the original entry fraction.
+            // Keep this recursive call in the same bridge instead of requiring
+            // the title to make a second weapon call manually.
+            if (CanPenetrateGlass is not null)
+            {
+                var glass = query.CastSourceGlass(info.OriginMeters, shotDirection,
+                    info.DistanceMeters, CanPenetrateGlass);
+                if (glass.PassedThrough)
+                {
+                    GlassImpact?.Invoke(glass.Entry);
+                    GlassImpact?.Invoke(glass.Exit);
+                    if (glass.ContinuationHit is not null)
+                    {
+                        var behindGlassInfo = new SourceFireBulletsInfo(
+                            // Source starts exactly at penetrationTrace.endpos;
+                            // Jolt treats that boundary point as an immediate
+                            // re-hit, so use the same narrow-phase epsilon as
+                            // CastSourceGlass while retaining Source's
+                            // authored remaining-distance calculation.
+                            1, glass.Exit.Position + shotDirection * SourceUnits.ToMeters(0.001f), shotDirection, Vector3.Zero,
+                            info.DistanceMeters * (1f - glass.Entry.Fraction),
+                            info.AmmoType, info.TracerFrequency, info.Damage,
+                            Flags: info.Flags, PrimaryAttack: info.PrimaryAttack,
+                            AttackerBodyId: info.AttackerBodyId);
+                        FireBulletsInternal(in behindGlassInfo, sourceRandomSeed,
+                            advanceRecordingTick: false);
+                    }
+                }
+            }
         }
         multiDamage.ApplyMultiDamage();
-        if (Recording is not null) RecordingTick++;
+        if (advanceRecordingTick && Recording is not null) RecordingTick++;
         return results;
     }
 

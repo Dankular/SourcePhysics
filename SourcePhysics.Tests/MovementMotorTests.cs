@@ -1515,6 +1515,30 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void FireBulletsAutomaticallyRefiresBehindReferenceGlass()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(2048, 0, 2048, 256);
+        host.CreateBoxBody(new(1f, 1f, 0.05f), new(0f, 0f, 2f),
+            JoltPhysicsSharp.MotionType.Static, SourceObjectLayer.World,
+            new SourceRigidBodyProfile { ContentsMask = SourceContents.Window });
+        var behind = host.CreateBoxBody(new(1f, 1f, 0.1f), new(0f, 0f, 4f),
+            JoltPhysicsSharp.MotionType.Static, SourceObjectLayer.World);
+        var weapon = new JoltHitscanWeapon { CanPenetrateGlass = hit =>
+            (hit.Contents & SourceContents.Window) != 0 };
+        var hits = new List<HitscanHit>();
+        weapon.Hit += hits.Add;
+        weapon.Initialize(host);
+
+        weapon.FireBullets(new SourceFireBulletsInfo(1, Vector3.Zero, Vector3.UnitZ,
+            Vector3.Zero, 10f, 1, Damage: 1f), 7);
+
+        Assert.Equal(2, hits.Count);
+        Assert.Equal(behind.ID, unchecked((uint)hits[1].BodyId));
+        weapon.Cancel();
+    }
+
+    [Fact]
     public void CounterStrikeHitscanPairsJoltEntryAndExitAndContinuesUntilPowerEnds()
     {
         using var host = new JoltPhysicsHost(new SourceMovementProfile());
