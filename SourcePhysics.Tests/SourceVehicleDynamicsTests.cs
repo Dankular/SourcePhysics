@@ -143,6 +143,27 @@ public sealed class SourceVehicleDynamicsTests
     }
 
     [Fact]
+    public void ControlPreparationMatchesSourceVehicleUpdateOrdering()
+    {
+        var prepared = SourceVehicleDynamics.PrepareControl(
+            new SourceVehicleControl { Throttle = 0.5f, Brake = 0f, Handbrake = true },
+            SourceVehicleDynamics.MilesPerHourToSourceUnitsPerSecond(20f), false);
+        Assert.Equal(0f, prepared.Control.Throttle);
+        Assert.Equal(0f, prepared.Control.Brake);
+        Assert.True(prepared.Powerslide);
+
+        var boosting = SourceVehicleDynamics.PrepareControl(
+            new SourceVehicleControl { Throttle = 0f, Brake = 0f }, 0f, true);
+        Assert.Equal(1f, boosting.Control.Throttle);
+        Assert.Equal(1f, boosting.Control.Boost);
+        Assert.Equal(0f, boosting.Control.Brake);
+
+        var idle = SourceVehicleDynamics.PrepareControl(new SourceVehicleControl(), 0f, false);
+        Assert.Equal(0.1f, idle.Control.Brake);
+        Assert.False(idle.Powerslide);
+    }
+
+    [Fact]
     public void SkidStateSelectsFastestContactAndLocksToSpeedWhenHandbraking()
     {
         var profile = Profile() with

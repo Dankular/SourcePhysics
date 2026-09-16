@@ -8,12 +8,46 @@ namespace SourcePhysics;
 public static class SourceVehicleDynamics
 {
     public const float ThrottleOpposingForceEpsilonSourceUnitsPerSecond = 5f;
+    public const float PowerslideSpeedThresholdSourceUnitsPerSecond = 18f;
     public const float WheelContactConeSin15Degrees = 0.2588f;
     public const float MilesPerHourToMetersPerSecond = 0.44707f;
     public const float WattsPerHorsepower = 745f;
     public const float SecondsPerMinute = 60f;
 
     public readonly record struct SpeedGovernorResult(float Throttle, float Brake);
+    public readonly record struct PreparedControl(SourceVehicleControl Control, bool Powerslide);
+
+    /// Exact control preprocessing performed by CVehicleController::Update
+    /// before steering, engine, handbrake and skid dispatch. Physics-system
+    /// integration consumes this result; no Jolt policy is introduced here.
+    public static PreparedControl PrepareControl(SourceVehicleControl control,
+        float speedSourceUnitsPerSecond, bool isBoosting)
+    {
+        ArgumentNullException.ThrowIfNull(control);
+        if (!float.IsFinite(speedSourceUnitsPerSecond))
+            throw new ArgumentOutOfRangeException(nameof(speedSourceUnitsPerSecond));
+        if (!float.IsFinite(control.Throttle) || !float.IsFinite(control.Brake) ||
+            !float.IsFinite(control.Boost))
+            throw new ArgumentOutOfRangeException(nameof(control));
+
+        var absoluteSpeed = MathF.Abs(speedSourceUnitsPerSecond);
+        var throttle = control.Throttle;
+        var brake = control.Brake;
+        var powerslide = control.Handbrake &&
+            absoluteSpeed > PowerslideSpeedThresholdSourceUnitsPerSecond;
+
+        if (control.Handbrake)
+            throttle = 0f;
+        if (isBoosting)
+        {
+            throttle = throttle < 0f ? -1f : 1f;
+            control = control with { Boost = 1f };
+        }
+        if (throttle == 0f && brake == 0f && !control.Handbrake)
+            brake = 0.1f;
+
+        return new(control with { Throttle = throttle, Brake = brake }, powerslide);
+    }
 
     /// Exact CVehicleController::CalcEngine speed-governor branch from
     /// physics_vehicle.cpp. Source has separate PC and console rules, so the
