@@ -35,6 +35,7 @@ public static class SourcePhysicsStateMath
             expected.State.ContentsMask == actual.State.ContentsMask &&
             expected.State.CollisionGroup == actual.State.CollisionGroup &&
             expected.State.SolidFlags == actual.State.SolidFlags &&
+            expected.State.CallbackFlags == actual.State.CallbackFlags &&
             expected.State.UserData == actual.State.UserData;
     }
 }
@@ -112,6 +113,7 @@ public static class PhysicsWorldComparator
             if (expectedState.ContentsMask != actualState.ContentsMask) errors.Add($"contents:{expectedBody.Key}");
             if (expectedState.CollisionGroup != actualState.CollisionGroup) errors.Add($"collision-group:{expectedBody.Key}");
             if (expectedState.SolidFlags != actualState.SolidFlags) errors.Add($"solid-flags:{expectedBody.Key}");
+            if (expectedState.CallbackFlags != actualState.CallbackFlags) errors.Add($"callback-flags:{expectedBody.Key}");
             if (expectedState.UserData != actualState.UserData) errors.Add($"user-data:{expectedBody.Key}");
             if (expectedState.Position != actualState.Position) errors.Add($"position:{expectedBody.Key}");
             if (expectedState.Rotation != actualState.Rotation) errors.Add($"rotation:{expectedBody.Key}");

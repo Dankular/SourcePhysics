@@ -365,6 +365,16 @@ public sealed partial class JoltPhysicsHost : IDisposable
     }
 
     public SourceContents GetBodyContents(BodyID id) => bodyContents.TryGetValue(id.ID, out var contents) ? contents : SourceContents.Solid;
+    public SourceCallbackFlags GetBodyCallbackFlags(BodyID id) =>
+        bodyProfiles.TryGetValue(id.ID, out var profile) ? profile.CallbackFlags : SourceCallbackFlags.Default;
+    public void SetBodyCallbackFlags(BodyID id, SourceCallbackFlags flags)
+    {
+        EnsureBody(id);
+        const SourceCallbackFlags supportedCallbackFlags = (SourceCallbackFlags)0xFFFF;
+        if ((flags & ~supportedCallbackFlags) != 0) throw new ArgumentOutOfRangeException(nameof(flags));
+        if (bodyProfiles.TryGetValue(id.ID, out var profile))
+            bodyProfiles[id.ID] = profile with { CallbackFlags = flags };
+    }
     public float GetBodyBuoyancyRatio(BodyID id) =>
         bodyProfiles.TryGetValue(id.ID, out var profile) ? profile.BuoyancyRatio : 1f;
     public bool IsFluidSimulationEnabled(BodyID id) =>

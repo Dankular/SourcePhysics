@@ -484,7 +484,8 @@ public sealed class MovementMotorTests
             {
                 GravityFactor = 0f,
                 CollisionGroup = SourceCollisionGroup.PushAway,
-                SolidFlags = SourceSolidFlags.NotSolid
+                SolidFlags = SourceSolidFlags.NotSolid,
+                CallbackFlags = SourceCallbackFlags.Default & ~SourceCallbackFlags.DoFluidSimulation
             });
         host.Bodies.SetLinearVelocity(body, new(1f, 2f, 3f));
         var captured = host.CaptureState(17);
@@ -501,6 +502,8 @@ public sealed class MovementMotorTests
         Assert.True(SourcePhysicsStateMath.NearlyEqual(expected, current, 0.000001f, 0.000001f, 0.000001f));
         Assert.Equal(SourceCollisionGroup.PushAway, current.State.CollisionGroup);
         Assert.Equal(SourceSolidFlags.NotSolid, current.State.SolidFlags);
+        Assert.Equal(SourceCallbackFlags.Default & ~SourceCallbackFlags.DoFluidSimulation,
+            current.State.CallbackFlags);
     }
 
     [Fact]

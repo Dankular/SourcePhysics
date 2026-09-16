@@ -16,7 +16,8 @@ public readonly record struct SourceRigidBodyState(
     SourceContents ContentsMask = SourceContents.Solid,
     ulong UserData = 0,
     SourceCollisionGroup CollisionGroup = SourceCollisionGroup.None,
-    SourceSolidFlags SolidFlags = SourceSolidFlags.None);
+    SourceSolidFlags SolidFlags = SourceSolidFlags.None,
+    SourceCallbackFlags CallbackFlags = SourceCallbackFlags.Default);
 
 public static class JoltRigidBodyState
 {
@@ -34,7 +35,8 @@ public static class JoltRigidBodyState
             host.Bodies.GetAngularVelocity(bodyId), host.Bodies.IsActive(bodyId),
             host.Bodies.GetMotionType(bodyId), host.Bodies.GetGravityFactor(bodyId),
             host.Bodies.GetFriction(bodyId), host.Bodies.GetRestitution(bodyId), host.GetBodyContents(bodyId),
-            host.Bodies.GetUserData(bodyId), host.GetBodyCollisionGroup(bodyId), host.GetBodySolidFlags(bodyId));
+            host.Bodies.GetUserData(bodyId), host.GetBodyCollisionGroup(bodyId), host.GetBodySolidFlags(bodyId),
+            host.GetBodyCallbackFlags(bodyId));
     }
 
     public static void Restore(JoltPhysicsHost host, BodyID bodyId, in SourceRigidBodyState state)
@@ -53,6 +55,7 @@ public static class JoltRigidBodyState
         host.Bodies.SetUserData(bodyId, state.UserData);
         host.SetBodyCollisionGroup(bodyId, state.CollisionGroup);
         host.SetBodySolidFlags(bodyId, state.SolidFlags);
+        host.SetBodyCallbackFlags(bodyId, state.CallbackFlags);
 
         host.Bodies.SetRPositionAndRotation(in bodyId, in position, in rotation,
             state.Active ? Activation.Activate : Activation.DontActivate);

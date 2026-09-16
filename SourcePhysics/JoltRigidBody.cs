@@ -47,6 +47,8 @@ public sealed class JoltRigidBody : SyncScript
     public SourceCollisionGroup GetCollisionGroup() => PhysicsSystem.Host.GetBodyCollisionGroup(BodyId);
     public void SetSolidFlags(SourceSolidFlags flags) => PhysicsSystem.Host.SetBodySolidFlags(BodyId, flags);
     public SourceSolidFlags GetSolidFlags() => PhysicsSystem.Host.GetBodySolidFlags(BodyId);
+    public void SetCallbackFlags(SourceCallbackFlags flags) => PhysicsSystem.Host.SetBodyCallbackFlags(BodyId, flags);
+    public SourceCallbackFlags GetCallbackFlags() => PhysicsSystem.Host.GetBodyCallbackFlags(BodyId);
     public bool ApplyBuoyancyImpulse(NumericsVector3 surfacePosition, NumericsVector3 surfaceNormal,
         float buoyancy, float linearDrag, float angularDrag, NumericsVector3 fluidVelocity, float deltaSeconds) =>
         PhysicsSystem.Host.ApplyBuoyancyImpulse(BodyId, surfacePosition, surfaceNormal,
