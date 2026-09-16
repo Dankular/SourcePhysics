@@ -28,7 +28,8 @@ public readonly record struct WeaponShotFrame(
     int AdditionalIgnoreBodyId = -1,
     int InflictorBodyId = -1,
     int AttackerBodyId = -1,
-    int WeaponBodyId = -1);
+    int WeaponBodyId = -1,
+    float PhysicsPushScale = 1f);
 
 public sealed class WeaponRecording
 {
@@ -41,7 +42,7 @@ public sealed class WeaponRecording
 
     public void Capture(int tick, int shotIndex, int randomSeed, Vector3 origin, Vector3 direction,
         bool hit, HitscanHit hitData, in SourceFireBulletsInfo info, SourceFireBulletsImpact? impact,
-        SourceShotTraceShape traceShape = SourceShotTraceShape.Ray)
+        SourceShotTraceShape traceShape = SourceShotTraceShape.Ray, float physicsPushScale = 1f)
     {
         Frames.Add(new(tick, shotIndex, randomSeed, origin, direction, hit, hitData,
             info.AmmoType, info.PlayerDamage, impact?.Damage ?? 0f,
@@ -51,7 +52,7 @@ public sealed class WeaponRecording
             impact?.DamageSuppressed ?? false, impact?.DamageForce ?? default,
             impact?.TracerDestination ?? (hit ? hitData.Position : origin + direction * info.DistanceMeters),
             traceShape, info.AdditionalIgnoreBodyId, info.InflictorBodyId,
-            info.AttackerBodyId, info.WeaponBodyId));
+            info.AttackerBodyId, info.WeaponBodyId, physicsPushScale));
     }
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
@@ -121,6 +122,8 @@ public static class WeaponParityComparator
                 errors.Add(new(left.Tick, left.ShotIndex, "attacker-body"));
             if (left.WeaponBodyId != right.WeaponBodyId)
                 errors.Add(new(left.Tick, left.ShotIndex, "weapon-body"));
+            if (left.PhysicsPushScale != right.PhysicsPushScale)
+                errors.Add(new(left.Tick, left.ShotIndex, "physics-push-scale"));
 
             var directionError = Vector3.Distance(left.Direction, right.Direction);
             directionSum += directionError * directionError;

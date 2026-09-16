@@ -1185,6 +1185,7 @@ public sealed class MovementMotorTests
         Assert.Equal(25f, recording.Frames[0].AppliedDamage);
         Assert.Equal(0x3234, recording.Frames[0].DamageType);
         Assert.Equal(SourceFireBulletsFlags.FirstShotAccurate, recording.Frames[0].Flags);
+        Assert.Equal(1.5f, recording.Frames[0].PhysicsPushScale);
         Assert.Equal(new Vector3(0f, 0f, 75f), recording.Frames[0].DamageForce);
         Assert.Equal(2, damageTarget.TraceCount);
         Assert.Equal(1, damageTarget.TakeDamageCount);

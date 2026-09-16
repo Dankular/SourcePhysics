@@ -196,7 +196,7 @@ public sealed class JoltHitscanWeapon : SyncScript
             if (!result.Hit)
             {
                 Recording?.Capture(RecordingTick, shot, shotSeed, info.OriginMeters, result.Direction,
-                    false, result.HitData, in resolvedInfo, null, traceShape);
+                    false, result.HitData, in resolvedInfo, null, traceShape, PhysicsPushScale);
                 continue;
             }
             var startedInWater = IsWaterPoint?.Invoke(info.OriginMeters) ?? false;
@@ -255,7 +255,7 @@ public sealed class JoltHitscanWeapon : SyncScript
                 ForceDropIfCarried?.Invoke(result.HitData);
             Impact?.Invoke(impact);
             Recording?.Capture(RecordingTick, shot, shotSeed, info.OriginMeters, result.Direction,
-                true, result.HitData, in resolvedInfo, impact, traceShape);
+                true, result.HitData, in resolvedInfo, impact, traceShape, PhysicsPushScale);
         }
         multiDamage.ApplyMultiDamage();
         if (Recording is not null) RecordingTick++;
