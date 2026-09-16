@@ -19,7 +19,7 @@ public sealed class SourceVehicleRecording
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true, IncludeFields = true };
 
     public string Profile { get; init; } = "source-vehicle";
-    public float FixedStepSeconds { get; init; } = 1f / 66f;
+    public float FixedStepSeconds { get; set; } = 1f / 66f;
     public List<SourceVehicleTickFrame> Frames { get; init; } = new();
 
     public void Capture(int tick, SourceVehicleControl control,

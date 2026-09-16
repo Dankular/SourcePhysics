@@ -25,8 +25,13 @@ public sealed class JoltVehicleContactRecorder : SyncScript
         if (PhysicsSystem is null) throw new InvalidOperationException("Assign PhysicsSystem before starting JoltVehicleContactRecorder.");
         PhysicsSystem.EnsureStarted();
         Profile.Validate();
-        if (RayLengthsSourceUnits.Length != 0 && RayLengthsSourceUnits.Length != Profile.WheelCount)
+        if (RayLengthsSourceUnits.Length != Profile.WheelCount)
             throw new InvalidDataException("Vehicle ray-length count must match the vehicle wheel count.");
+        if (RayLengthsSourceUnits.Any(length => !float.IsFinite(length) || length <= 0f))
+            throw new InvalidDataException("Vehicle ray lengths must be finite and positive.");
+        if (RecordVehicle && (ControlProvider is null || OperatingStateProvider is null))
+            throw new InvalidOperationException("Vehicle recording requires authored control and operating-state providers.");
+        Recording.FixedStepSeconds = PhysicsSystem.FixedStepSeconds;
         PhysicsSystem.FixedTickCompleted += OnFixedTickCompleted;
     }
 
@@ -40,16 +45,14 @@ public sealed class JoltVehicleContactRecorder : SyncScript
         CurrentSkidSamples = Array.Empty<SourceVehicleWheelSkidSample>();
     }
 
-    private void OnFixedTickCompleted(int tick, float deltaSeconds)
+    private void OnFixedTickCompleted(int tick, float _)
     {
-        if (VehicleBody is null || !VehicleBody.BodyId.IsValid || RayLengthsSourceUnits.Length != Profile.WheelCount)
+        if (VehicleBody is null || !VehicleBody.BodyId.IsValid)
             return;
         queries ??= new JoltVehicleWheelQueries(PhysicsSystem.Host, VehicleBody.BodyId, Profile);
         CurrentContacts = queries.Trace(RayLengthsSourceUnits);
         CurrentSkidSamples = queries.BuildSkidSamples(CurrentContacts);
         if (!RecordVehicle) return;
-        if (ControlProvider is null || OperatingStateProvider is null)
-            throw new InvalidOperationException("Vehicle recording requires authored control and operating-state providers.");
-        Recording.Capture(tick, ControlProvider(), OperatingStateProvider(), CurrentContacts, CurrentSkidSamples);
+        Recording.Capture(tick, ControlProvider!(), OperatingStateProvider!(), CurrentContacts, CurrentSkidSamples);
     }
 }
