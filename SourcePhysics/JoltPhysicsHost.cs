@@ -24,6 +24,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
     private readonly Dictionary<uint, SourceObjectLayer> bodyRequestedLayers = new();
     private readonly Dictionary<uint, SourceSolidFlags> bodySolidFlags = new();
     private readonly Dictionary<uint, SourceCollisionGroup> bodyCollisionGroups = new();
+    private readonly Dictionary<uint, bool> bodyCollisionEnabled = new();
     private readonly HashSet<uint> triggerTouchesDebris = new();
     private readonly HashSet<uint> nonSolidBodies = new();
     private readonly HashSet<uint> perTriangleSurfaceBodies = new();
@@ -71,8 +72,10 @@ public sealed partial class JoltPhysicsHost : IDisposable
 
     private readonly Vector3 gravity;
 
-    private static SourceObjectLayer GetEffectiveLayer(SourceObjectLayer requested, SourceSolidFlags flags)
+    private static SourceObjectLayer GetEffectiveLayer(SourceObjectLayer requested, SourceSolidFlags flags,
+        bool enableCollisions = true)
     {
+        if (!enableCollisions) return SourceObjectLayer.NonSolid;
         if ((flags & SourceSolidFlags.Trigger) != 0 || requested == SourceObjectLayer.Trigger)
             return SourceObjectLayer.Trigger;
         return (flags & SourceSolidFlags.NotSolid) != 0 ? SourceObjectLayer.NonSolid : requested;
@@ -200,7 +203,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
             shape = offsetShape;
         }
         RVector3 precisePosition = position;
-        var effectiveLayer = GetEffectiveLayer(layer, profile.SolidFlags);
+        var effectiveLayer = GetEffectiveLayer(layer, profile.SolidFlags, profile.EnableCollisions);
         var effectiveCollisionGroup = GetEffectiveCollisionGroup(effectiveLayer, profile.CollisionGroup);
         var effectiveSolidFlags = profile.SolidFlags |
             (effectiveLayer == SourceObjectLayer.Trigger ? SourceSolidFlags.Trigger : SourceSolidFlags.None) |
@@ -239,6 +242,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyRequestedLayers[id.ID] = layer;
         bodySolidFlags[id.ID] = effectiveSolidFlags;
         bodyCollisionGroups[id.ID] = effectiveCollisionGroup;
+        bodyCollisionEnabled[id.ID] = profile.EnableCollisions;
         if ((effectiveSolidFlags & SourceSolidFlags.NotSolid) != 0 && !isTrigger)
             nonSolidBodies.Add(id.ID);
         if (isTrigger)
@@ -320,6 +324,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyRequestedLayers[id.ID] = layer;
         bodySolidFlags[id.ID] = effectiveSolidFlags;
         bodyCollisionGroups[id.ID] = effectiveCollisionGroup;
+        bodyCollisionEnabled[id.ID] = true;
         if ((effectiveSolidFlags & SourceSolidFlags.NotSolid) != 0 && !isTrigger)
             nonSolidBodies.Add(id.ID);
         if (profile.TriangleSurfaceIds is not null) perTriangleSurfaceBodies.Add(id.ID);
@@ -334,7 +339,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
 
     public bool IsSensor(BodyID id) => sensorBodies.Contains(id.ID);
     internal bool IsStaticBody(BodyID id) => staticBodies.Contains(id.ID);
-    public bool IsSolidBody(BodyID id) => !nonSolidBodies.Contains(id.ID);
+    public bool IsSolidBody(BodyID id) => bodyCollisionEnabled.TryGetValue(id.ID, out var enabled) && enabled &&
+        !nonSolidBodies.Contains(id.ID);
     public SourceSolidFlags GetBodySolidFlags(BodyID id) =>
         bodySolidFlags.TryGetValue(id.ID, out var flags) ? flags : SourceSolidFlags.None;
     public void SetBodySolidFlags(BodyID id, SourceSolidFlags flags)
@@ -345,7 +351,8 @@ public sealed partial class JoltPhysicsHost : IDisposable
         if ((flags & ~supportedSolidFlags) != 0) throw new ArgumentOutOfRangeException(nameof(flags));
         if (!bodyRequestedLayers.TryGetValue(id.ID, out var requestedLayer))
             requestedLayer = SourceObjectLayer.World;
-        var effectiveLayer = GetEffectiveLayer(requestedLayer, flags);
+        var enabled = !bodyCollisionEnabled.TryGetValue(id.ID, out var collisionEnabled) || collisionEnabled;
+        var effectiveLayer = GetEffectiveLayer(requestedLayer, flags, enabled);
         var objectLayer = new ObjectLayer((ushort)effectiveLayer);
         var ownedId = id;
         Bodies.SetObjectLayer(in ownedId, in objectLayer);
@@ -646,6 +653,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyRequestedLayers.Remove(id.ID);
         bodySolidFlags.Remove(id.ID);
         bodyCollisionGroups.Remove(id.ID);
+        bodyCollisionEnabled.Remove(id.ID);
         triggerTouchesDebris.Remove(id.ID);
         nonSolidBodies.Remove(id.ID);
         staticBodies.Remove(id.ID);
@@ -704,6 +712,7 @@ public sealed partial class JoltPhysicsHost : IDisposable
         bodyRequestedLayers.Clear();
         bodySolidFlags.Clear();
         bodyCollisionGroups.Clear();
+        bodyCollisionEnabled.Clear();
         triggerTouchesDebris.Clear();
         nonSolidBodies.Clear();
         staticBodies.Clear();

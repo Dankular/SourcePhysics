@@ -875,6 +875,25 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void SourceObjectParamsEnableCollisionsDisablesQueriesAndSolverFiltering()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(1024, 0, 1024, 256);
+        var body = host.CreateBoxBody(new(0.25f), new(0f, 1f, 0f), JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                EnableCollisions = false,
+                ContentsMask = SourceContents.Solid
+            });
+        using var movementQueries = new JoltMovementQueries(host);
+        using var hitscan = new JoltHitscanQueries(host);
+
+        Assert.False(host.IsSolidBody(body));
+        Assert.Equal(-1, movementQueries.SweepPlayer(new(0f, 2f, 0f), new(0f, 0.5f, 0f), false).BodyId);
+        Assert.False(hitscan.Cast(new(0f, 2f, 0f), -Vector3.UnitY, 2f, out _));
+    }
+
+    [Fact]
     public void ProfilesRejectUnknownSourceCollisionStateBits()
     {
         Assert.Throws<InvalidDataException>(() => new SourceRigidBodyProfile

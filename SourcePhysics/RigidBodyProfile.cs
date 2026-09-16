@@ -14,6 +14,8 @@ public sealed record SourceRigidBodyProfile
     public float MaxLinearVelocityMetersPerSecond { get; init; } = 88.9f;
     public float MaxAngularVelocityRadiansPerSecond { get; init; } = 47.1239f;
     public bool ContinuousCollision { get; init; }
+    /// Source objectparams_t::enableCollisions.
+    public bool EnableCollisions { get; init; } = true;
     public bool AllowSleep { get; init; } = true;
     public float Friction { get; init; } = 0.8f;
     public float Restitution { get; init; } = 0.001f;
