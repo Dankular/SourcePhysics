@@ -305,7 +305,12 @@ public sealed partial class JoltPhysicsHost : IDisposable
         Bodies.SetUserData(id, profile.UserData);
         ownedBodies.Add(id);
         bodySurfaces[id.ID] = profile.SurfaceId;
-        bodyProfiles[id.ID] = new SourceRigidBodyProfile { Friction = profile.Friction, Restitution = profile.Restitution };
+        bodyProfiles[id.ID] = new SourceRigidBodyProfile
+        {
+            Friction = profile.Friction,
+            Restitution = profile.Restitution,
+            CallbackFlags = profile.CallbackFlags
+        };
         bodyContents[id.ID] = profile.ContentsMask;
         bodyLayers[id.ID] = effectiveLayer;
         bodyRequestedLayers[id.ID] = layer;

@@ -8,6 +8,8 @@ public sealed record SourceStaticMeshProfile
     public uint MaxTrianglesPerLeaf { get; init; } = 8;
     public int SurfaceId { get; init; }
     public SourceContents ContentsMask { get; init; } = SourceContents.Solid;
+    /// Source VPhysics callback flags carried by the authored static object.
+    public SourceCallbackFlags CallbackFlags { get; init; } = SourceCallbackFlags.Default;
     /// Source collision-property solid flags.
     public SourceSolidFlags SolidFlags { get; init; }
     /// Optional Source collision group. None leaves the host's object-layer policy in control.
@@ -28,7 +30,9 @@ public sealed record SourceStaticMeshProfile
     {
         const SourceSolidFlags supportedSolidFlags = SourceSolidFlags.NotSolid |
             SourceSolidFlags.Trigger | SourceSolidFlags.TriggerTouchDebris;
-        if (!Enum.IsDefined(CollisionGroup) || (SolidFlags & ~supportedSolidFlags) != 0)
+        const SourceCallbackFlags supportedCallbackFlags = (SourceCallbackFlags)0xFFFF;
+        if (!Enum.IsDefined(CollisionGroup) || (CallbackFlags & ~supportedCallbackFlags) != 0 ||
+            (SolidFlags & ~supportedSolidFlags) != 0)
             throw new InvalidDataException("Static mesh profile contains an unknown Source collision state.");
         if (!float.IsFinite(Friction) || Friction < 0f)
             throw new InvalidDataException("Static mesh friction must be finite and non-negative.");
