@@ -7,6 +7,8 @@ namespace SourcePhysics;
 public readonly record struct SourceContactEvent(uint BodyA, uint BodyB, Vector3 ContactPoint, bool Persisted,
     Vector3 Normal = default, float PenetrationDepth = 0f);
 public readonly record struct SourceContactRemovedEvent(uint BodyA, uint BodyB);
+public readonly record struct SourceCollisionEvent(uint BodyA, uint BodyB, Vector3 ContactPoint,
+    Vector3 Normal = default, float PenetrationDepth = 0f);
 public readonly record struct SourceTriggerEvent(uint TriggerBody, uint OtherBody, Vector3 ContactPoint, bool Persisted,
     Vector3 Normal = default);
 public readonly record struct SourceTriggerRemovedEvent(uint TriggerBody, uint OtherBody);
@@ -24,12 +26,16 @@ public sealed class SourceContactRouter
     public event Action<SourceContactEvent>? ContactAdded;
     public event Action<SourceContactEvent>? ContactPersisted;
     public event Action<SourceContactRemovedEvent>? ContactRemoved;
+    /// Source PreCollision-equivalent notification. It is emitted only when
+    /// both bodies have CALLBACK_GLOBAL_COLLISION and static-pair gating passes.
+    public event Action<SourceCollisionEvent>? CollisionStarted;
     public event Action<SourceTriggerEvent>? TriggerEntered;
     public event Action<SourceTriggerEvent>? TriggerStayed;
     public event Action<SourceTriggerRemovedEvent>? TriggerExited;
     private readonly ConcurrentQueue<SourceContactEvent> added = new();
     private readonly ConcurrentQueue<SourceContactEvent> persisted = new();
     private readonly ConcurrentQueue<SourceContactRemovedEvent> removed = new();
+    private readonly ConcurrentQueue<SourceCollisionEvent> collisionStarted = new();
     private readonly ConcurrentQueue<SourceTriggerEvent> triggerEntered = new();
     private readonly ConcurrentQueue<SourceTriggerEvent> triggerStayed = new();
     private readonly ConcurrentQueue<SourceTriggerRemovedEvent> triggerExited = new();
@@ -63,6 +69,9 @@ public sealed class SourceContactRouter
         ApplySourceCombine(a, b, manifold.SubShapeID1, manifold.SubShapeID2, ref settings);
         var contact = CreateEvent(a, b, manifold, false);
         if (ShouldDispatchGlobalTouch(a.ID, b.ID)) added.Enqueue(contact);
+        if (ShouldDispatchGlobalCollision(a.ID, b.ID))
+            collisionStarted.Enqueue(new(contact.BodyA, contact.BodyB, contact.ContactPoint,
+                contact.Normal, contact.PenetrationDepth));
         QueueTrigger(contact);
     }
 
@@ -106,6 +115,18 @@ public sealed class SourceContactRouter
             (flags & SourceCallbackFlags.GlobalTouchStatic) != 0;
     }
 
+    private bool ShouldDispatchGlobalCollision(BodyID first, BodyID second)
+    {
+        var firstFlags = callbackFlagsResolver(first);
+        var secondFlags = callbackFlagsResolver(second);
+        if ((firstFlags & SourceCallbackFlags.GlobalCollision) == 0 ||
+            (secondFlags & SourceCallbackFlags.GlobalCollision) == 0)
+            return false;
+        var staticPair = staticResolver(first) || staticResolver(second);
+        var flags = firstFlags | secondFlags;
+        return !staticPair || (flags & SourceCallbackFlags.GlobalCollideStatic) != 0;
+    }
+
     private void QueueTrigger(in SourceContactEvent contact)
     {
         if (sensorResolver(new BodyID(contact.BodyA)))
@@ -127,6 +148,7 @@ public sealed class SourceContactRouter
         while (added.TryDequeue(out var value)) ContactAdded?.Invoke(value);
         while (persisted.TryDequeue(out var value)) ContactPersisted?.Invoke(value);
         while (removed.TryDequeue(out var value)) ContactRemoved?.Invoke(value);
+        while (collisionStarted.TryDequeue(out var value)) CollisionStarted?.Invoke(value);
         while (triggerEntered.TryDequeue(out var value)) TriggerEntered?.Invoke(value);
         while (triggerStayed.TryDequeue(out var value)) TriggerStayed?.Invoke(value);
         while (triggerExited.TryDequeue(out var value)) TriggerExited?.Invoke(value);

@@ -649,6 +649,30 @@ public sealed class MovementMotorTests
     }
 
     [Fact]
+    public void ContactRouterCollisionCallbackRequiresBothSourceCollisionFlags()
+    {
+        using var host = new JoltPhysicsHost(new SourceMovementProfile());
+        host.Initialize(1024, 0, 1024, 256);
+        host.CreateBoxBody(new(1f), Vector3.Zero, JoltPhysicsSharp.MotionType.Static,
+            SourceObjectLayer.World);
+        host.CreateBoxBody(new(0.25f), Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile
+            {
+                GravityFactor = 0f,
+                CallbackFlags = SourceCallbackFlags.Default & ~SourceCallbackFlags.GlobalCollision
+            });
+        var collisions = 0;
+        host.Contacts.CollisionStarted += _ => collisions++;
+        host.Step();
+        Assert.Equal(0, collisions);
+
+        host.CreateBoxBody(new(0.25f), Vector3.Zero, JoltPhysicsSharp.MotionType.Dynamic,
+            SourceObjectLayer.Dynamic, new SourceRigidBodyProfile { GravityFactor = 0f });
+        host.Step();
+        Assert.True(collisions > 0);
+    }
+
+    [Fact]
     public void JoltContactCombineUsesTheContactManifoldTriangleSurface()
     {
         var frictionPair = default((string First, string Second));
